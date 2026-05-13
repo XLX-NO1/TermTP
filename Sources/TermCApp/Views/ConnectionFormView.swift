@@ -5,9 +5,15 @@ struct ConnectionFormView: View {
     @Environment(\.dismiss) private var dismiss
 
     private var canSave: Bool {
-        UInt16(state.draftPort.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
-            && !state.draftHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !state.draftUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let port = UInt16(state.draftPort.trimmingCharacters(in: .whitespacesAndNewlines))
+        let host = state.draftHost.trimmingCharacters(in: .whitespacesAndNewlines)
+        let username = state.draftUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+        let privateKeyPath = state.draftPrivateKeyPath.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return port.map { $0 > 0 } ?? false
+            && !host.isEmpty
+            && !username.isEmpty
+            && (!state.draftUsesKey || !privateKeyPath.isEmpty)
     }
 
     var body: some View {

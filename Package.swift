@@ -32,6 +32,10 @@ let package = Package(
         .testTarget(
             name: "TermCCoreTests",
             dependencies: ["TermCCore"]
+        ),
+        .testTarget(
+            name: "TermCAppTests",
+            dependencies: ["TermCApp"]
         )
     ]
 )

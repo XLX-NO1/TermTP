@@ -55,8 +55,10 @@ final class AppState {
 
         guard
             let port = UInt16(draftPort.trimmingCharacters(in: .whitespacesAndNewlines)),
+            port > 0,
             !host.isEmpty,
-            !username.isEmpty
+            !username.isEmpty,
+            !draftUsesKey || !privateKeyPath.isEmpty
         else {
             return
         }
