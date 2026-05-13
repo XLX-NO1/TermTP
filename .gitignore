@@ -1,5 +1,6 @@
 .superpowers/
 .worktrees/
+.build/
 .DS_Store
 DerivedData/
 build/
