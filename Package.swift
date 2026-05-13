@@ -8,7 +8,8 @@ let package = Package(
     ],
     products: [
         .library(name: "TermCCore", targets: ["TermCCore"]),
-        .executable(name: "TermCApp", targets: ["TermCApp"])
+        .executable(name: "TermCApp", targets: ["TermCApp"]),
+        .executable(name: "TermCIconTool", targets: ["TermCIconTool"])
     ],
     dependencies: [
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", branch: "main"),
@@ -28,6 +29,9 @@ let package = Package(
                 .product(name: "SwiftTerm", package: "SwiftTerm")
             ],
             resources: [.process("Resources")]
+        ),
+        .executableTarget(
+            name: "TermCIconTool"
         ),
         .testTarget(
             name: "TermCCoreTests",

@@ -3,11 +3,15 @@ import SwiftUI
 @main
 struct TermCApp: App {
     @State private var state = AppState()
+    @State private var menuBarController = MenuBarController()
 
     var body: some Scene {
         WindowGroup("TermC") {
             RootView(state: state)
                 .frame(minWidth: 1040, minHeight: 680)
+                .task {
+                    menuBarController.install(state: state)
+                }
         }
         .commands {
             CommandMenu("View") {

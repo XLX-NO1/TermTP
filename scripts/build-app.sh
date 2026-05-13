@@ -9,11 +9,15 @@ MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 
 cd "$ROOT_DIR"
+scripts/generate-icons.sh
 swift build -c debug --product TermCApp
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp ".build/debug/TermCApp" "$MACOS_DIR/TermC"
+cp "$BUILD_DIR/icons/TermCIcon-1024.png" "$RESOURCES_DIR/TermCIcon-1024.png"
+cp "$BUILD_DIR/icons/TermCIcon.icns" "$RESOURCES_DIR/TermCIcon.icns"
+cp "$BUILD_DIR/icons/TermCMenuBarTemplate.png" "$RESOURCES_DIR/TermCMenuBarTemplate.png"
 
 cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
