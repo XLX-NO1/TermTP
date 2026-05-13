@@ -6,7 +6,7 @@
 
 **Architecture:** Use a Swift Package as the source of truth so core behavior can be tested with `swift test` and the macOS app can be launched with `swift run TermCApp`. Keep domain models, persistence, credentials, transfers, SSH/SFTP adapters, and UI state in separate focused files. Wrap external dependencies behind small protocols so storage and connection workflows are testable before real SSH servers are involved.
 
-**Tech Stack:** Swift 6.3, SwiftUI, AppKit, Security Keychain Services, SwiftTerm, Traversio, Swift Package Manager, XCTest.
+**Tech Stack:** Swift 6.3, SwiftUI, AppKit, Security Keychain Services, SwiftTerm, Citadel, Swift Package Manager, XCTest.
 
 ---
 
@@ -19,9 +19,9 @@
 - `Sources/TermCCore/Stores/ImportExportService.swift`: non-sensitive connection import/export.
 - `Sources/TermCCore/Transfers/TransferQueue.swift`: upload/download queue state machine.
 - `Sources/TermCCore/SSH/SSHSessionModels.swift`: SSH session state and client protocols.
-- `Sources/TermCCore/SSH/TraversioSSHClient.swift`: Traversio-backed SSH adapter.
+- `Sources/TermCCore/SSH/CitadelSSHClient.swift`: Citadel-backed SSH adapter.
 - `Sources/TermCCore/SFTP/SFTPModels.swift`: remote file and operation models.
-- `Sources/TermCCore/SFTP/SFTPService.swift`: SFTP protocol, fake implementation, and Traversio-backed implementation.
+- `Sources/TermCCore/SFTP/SFTPService.swift`: SFTP protocol, fake implementation, and Citadel-backed implementation.
 - `Sources/TermCApp/TermCApp.swift`: SwiftUI app entry point.
 - `Sources/TermCApp/AppState.swift`: main UI/session state container.
 - `Sources/TermCApp/Views/RootView.swift`: main three-region layout.
@@ -80,13 +80,13 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", branch: "main"),
-        .package(url: "https://github.com/GitSwiftLLC/Traversio.git", from: "1.0.0")
+        .package(url: "https://github.com/orlandos-nl/Citadel.git", from: "0.9.2")
     ],
     targets: [
         .target(
             name: "TermCCore",
             dependencies: [
-                .product(name: "Traversio", package: "Traversio")
+                .product(name: "Citadel", package: "Citadel")
             ]
         ),
         .executableTarget(
@@ -1803,10 +1803,10 @@ git add Sources/TermCApp/Terminal Sources/TermCApp/Views/TerminalWorkspaceView.s
 git commit -m "feat: embed SwiftTerm terminal view"
 ```
 
-## Task 11: Traversio SSH Adapter
+## Task 11: Citadel SSH Adapter
 
 **Files:**
-- Create: `Sources/TermCCore/SSH/TraversioSSHClient.swift`
+- Create: `Sources/TermCCore/SSH/CitadelSSHClient.swift`
 - Create: `Tests/TermCCoreTests/SSHConfigurationTests.swift`
 
 - [ ] **Step 1: Write configuration mapping tests**
@@ -1835,13 +1835,13 @@ final class SSHConfigurationTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Implement summary and Traversio adapter skeleton**
+- [ ] **Step 2: Implement summary and Citadel adapter skeleton**
 
-Create `Sources/TermCCore/SSH/TraversioSSHClient.swift`:
+Create `Sources/TermCCore/SSH/CitadelSSHClient.swift`:
 
 ```swift
 import Foundation
-import Traversio
+import Citadel
 
 public struct SSHConfigurationSummary: Equatable, Sendable {
     public var host: String
@@ -1863,13 +1863,13 @@ public struct SSHConfigurationSummary: Equatable, Sendable {
     }
 }
 
-public struct TraversioSSHClient: SSHClientProviding {
+public struct CitadelSSHClient: SSHClientProviding {
     public init() {}
 
     public func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
         let configuration = try makeConfiguration(record: record, credential: credential)
         let connection = try await SSHClient.connect(configuration: configuration)
-        return TraversioSSHSession(record: record, connection: connection)
+        return CitadelSSHSession(record: record, connection: connection)
     }
 
     private func makeConfiguration(record: ConnectionRecord, credential: Credential?) throws -> SSHClientConfiguration {
@@ -1911,7 +1911,7 @@ public enum SSHClientAdapterError: Error, Equatable {
     case missingCredential
 }
 
-public actor TraversioSSHSession: SSHSessionProviding {
+public actor CitadelSSHSession: SSHSessionProviding {
     public let id = UUID()
     public let record: ConnectionRecord
     private let connection: SSHConnection
@@ -1944,7 +1944,7 @@ public actor TraversioSSHSession: SSHSessionProviding {
 }
 ```
 
-- [ ] **Step 3: Build the Traversio adapter**
+- [ ] **Step 3: Build the Citadel adapter**
 
 Run:
 
@@ -1952,13 +1952,13 @@ Run:
 swift test --filter SSHConfigurationTests
 ```
 
-Expected: `SSHConfigurationTests` pass and `TraversioSSHClient.swift` compiles against Traversio 1.0.0 using `SSHClient.connect(configuration:)`, `SSHClientConfiguration`, `.password`, OpenSSH private-key helpers, and `.knownHostsFile`.
+Expected: `SSHConfigurationTests` pass and `CitadelSSHClient.swift` compiles against Citadel 0.9.2 using Citadel's SSH client, authentication, and host-key APIs.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Sources/TermCCore/SSH/TraversioSSHClient.swift Tests/TermCCoreTests/SSHConfigurationTests.swift
-git commit -m "feat: add Traversio ssh adapter"
+git add Sources/TermCCore/SSH/CitadelSSHClient.swift Tests/TermCCoreTests/SSHConfigurationTests.swift
+git commit -m "feat: add Citadel ssh adapter"
 ```
 
 ## Task 12: SFTP Models and Fake Service
@@ -2222,5 +2222,5 @@ Create this commit only if the plan file was changed to mark completed checkboxe
 ## Self-Review Notes
 
 - Spec coverage: this plan covers app foundation, connection data, favorites/history storage, clear history support, non-sensitive import/export, Keychain credentials, collapsible side panels, multi-tab shell UI, menu bar hexagram, app icon generation, SSH adapter, SwiftTerm bridge, SFTP drawer, and verification.
-- Integration boundary: real interactive PTY streaming and real SFTP transfer progress are isolated behind `TraversioSSHClient`, `TerminalView`, and `SFTPServicing`. The plan first creates testable abstractions and fake implementations, then adds Traversio and SwiftTerm adapters.
+- Integration boundary: real interactive PTY streaming and real SFTP transfer progress are isolated behind `CitadelSSHClient`, `TerminalView`, and `SFTPServicing`. The plan first creates testable abstractions and fake implementations, then adds Citadel and SwiftTerm adapters.
 - Distribution boundary: App Store sandboxing and minimum macOS version remain release decisions from the design spec. The first implementation builds and launches locally as a developer app bundle.

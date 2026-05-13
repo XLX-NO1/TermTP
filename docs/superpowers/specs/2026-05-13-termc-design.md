@@ -134,11 +134,11 @@ The menu bar icon is a simplified white hexagram. It should be delivered as a te
 - SwiftUI for the app shell, panels, tabs, forms, settings, and general UI.
 - AppKit bridges for menu bar integration, window control, native file panels, and terminal embedding details when SwiftUI alone is not sufficient.
 - SwiftTerm for terminal emulation.
-- Traversio for SSH shell sessions, SFTP, password authentication, public-key authentication, host-key trust, and related SSH workflows.
+- Citadel for SSH shell sessions, SFTP, password authentication, public-key authentication, host-key trust, and related SSH workflows.
 - Keychain Services for sensitive credential storage.
 - Local JSON or a lightweight local persistence layer for non-sensitive connection metadata and UI preferences.
 
-Traversio is selected because it is a native Swift SSH and SFTP client library for Apple platforms, and its documented surface covers shell, command, authentication, host-key trust, and SFTP workflows. SwiftTerm is selected because it provides embeddable VT100/Xterm terminal emulation for Swift apps.
+Citadel is selected because it is a publicly available Swift SSH and SFTP client library built on SwiftNIO SSH, which keeps the first version closer to the native Swift architecture while avoiding unavailable private package dependencies. SwiftTerm is selected because it provides embeddable VT100/Xterm terminal emulation for Swift apps.
 
 ### Core Modules
 
@@ -226,7 +226,7 @@ Transfer records may be kept only for the running app session in version one unl
 1. User selects a favorite/history item or creates a manual connection.
 2. TermC loads the non-sensitive connection record from `ConnectionStore`.
 3. TermC requests the needed credential from `CredentialStore` or prompts the user if missing.
-4. `SSHSessionManager` creates a Traversio connection.
+4. `SSHSessionManager` creates a Citadel connection.
 5. Host-key trust is checked through `HostKeyTrustStore`.
 6. A shell session is opened.
 7. `TerminalSessionView` attaches SwiftTerm to the shell IO streams.
@@ -336,7 +336,7 @@ Implement connection records, history, favorites, clear history, import/export, 
 
 ### Milestone 3: SSH Terminal
 
-Integrate SwiftTerm and Traversio shell sessions, support password and key authentication, connect terminal IO, handle resize, disconnect, reconnect, and tab lifecycle.
+Integrate SwiftTerm and Citadel shell sessions, support password and key authentication, connect terminal IO, handle resize, disconnect, reconnect, and tab lifecycle.
 
 ### Milestone 4: SFTP Drawer
 
@@ -350,10 +350,10 @@ Refine macOS keyboard commands, menu bar behavior, empty states, errors, icon as
 
 - App Store distribution is not decided. This affects sandboxing, file access, network entitlements, and any use of private APIs.
 - Minimum macOS version is not yet fixed. The implementation should choose a version that supports the required SwiftUI and dependency APIs without unnecessary compatibility burden.
-- Traversio licensing and packaging should be reviewed before release, even though it is the selected technical direction for this design.
+- Citadel licensing and packaging should be reviewed before release, even though it is the selected technical direction for this design.
 
 ## References
 
-- Traversio: https://traversio.org/
+- Citadel: https://github.com/orlandos-nl/Citadel
 - SwiftTerm: https://github.com/migueldeicaza/SwiftTerm
 - SwiftNIO SSH: https://github.com/apple/swift-nio-ssh
