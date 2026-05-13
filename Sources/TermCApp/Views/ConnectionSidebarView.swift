@@ -2,15 +2,15 @@ import SwiftUI
 import TermCCore
 
 struct ConnectionSidebarView: View {
-    let connections: [ConnectionRecord]
+    @Bindable var state: AppState
     @State private var searchText = ""
 
     private var filteredConnections: [ConnectionRecord] {
         guard !searchText.isEmpty else {
-            return connections
+            return state.connections
         }
 
-        return connections.filter { connection in
+        return state.connections.filter { connection in
             connection.alias.localizedCaseInsensitiveContains(searchText)
                 || connection.host.localizedCaseInsensitiveContains(searchText)
                 || connection.username.localizedCaseInsensitiveContains(searchText)
@@ -26,6 +26,14 @@ struct ConnectionSidebarView: View {
             Text("Connections")
                 .font(.headline)
                 .foregroundStyle(.white)
+
+            Button {
+                state.beginNewConnection()
+            } label: {
+                Label("New Connection", systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             TextField("Search", text: $searchText)
                 .textFieldStyle(.roundedBorder)
@@ -97,6 +105,6 @@ private struct ConnectionRow: View {
 }
 
 #Preview {
-    ConnectionSidebarView(connections: [.samplePassword])
+    ConnectionSidebarView(state: AppState())
         .frame(width: 260, height: 640)
 }

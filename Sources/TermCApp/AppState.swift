@@ -10,6 +10,13 @@ final class AppState {
     var tabs: [TerminalTab]
     var connections: [ConnectionRecord]
     var transfers: [TransferRecord]
+    var isConnectionFormPresented = false
+    var draftAlias = ""
+    var draftHost = ""
+    var draftPort = "22"
+    var draftUsername = ""
+    var draftUsesKey = false
+    var draftPrivateKeyPath = ""
 
     init(
         tabs: [TerminalTab] = [.welcome],
@@ -28,6 +35,45 @@ final class AppState {
 
     func toggleSFTPDrawer() {
         isSFTPDrawerVisible.toggle()
+    }
+
+    func beginNewConnection() {
+        draftAlias = ""
+        draftHost = ""
+        draftPort = "22"
+        draftUsername = NSUserName()
+        draftUsesKey = false
+        draftPrivateKeyPath = ""
+        isConnectionFormPresented = true
+    }
+
+    func saveDraftConnection() {
+        let alias = draftAlias.trimmingCharacters(in: .whitespacesAndNewlines)
+        let host = draftHost.trimmingCharacters(in: .whitespacesAndNewlines)
+        let username = draftUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+        let privateKeyPath = draftPrivateKeyPath.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard
+            let port = UInt16(draftPort.trimmingCharacters(in: .whitespacesAndNewlines)),
+            !host.isEmpty,
+            !username.isEmpty
+        else {
+            return
+        }
+
+        let authentication: ConnectionAuthentication = draftUsesKey
+            ? .publicKey(privateKeyPath: privateKeyPath)
+            : .password
+        let connection = ConnectionRecord(
+            alias: alias.isEmpty ? host : alias,
+            host: host,
+            port: port,
+            username: username,
+            authentication: authentication
+        )
+
+        connections.append(connection)
+        isConnectionFormPresented = false
     }
 }
 

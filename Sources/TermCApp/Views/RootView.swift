@@ -6,7 +6,7 @@ struct RootView: View {
     var body: some View {
         HStack(spacing: 0) {
             if state.isSidebarVisible {
-                ConnectionSidebarView(connections: state.connections)
+                ConnectionSidebarView(state: state)
                     .frame(width: 260)
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
@@ -22,6 +22,9 @@ struct RootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(red: 0.08, green: 0.09, blue: 0.10))
+        .sheet(isPresented: $state.isConnectionFormPresented) {
+            ConnectionFormView(state: state)
+        }
         .animation(.snappy(duration: 0.22), value: state.isSidebarVisible)
         .animation(.snappy(duration: 0.22), value: state.isSFTPDrawerVisible)
         .toolbar {
