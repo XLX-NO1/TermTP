@@ -9,82 +9,109 @@ enum IconGenerator {
             withIntermediateDirectories: true
         )
 
-        let appIcon = drawAppIcon(size: CGSize(width: 1024, height: 1024))
-        let menuBarIcon = drawMenuBarTemplate(size: CGSize(width: 64, height: 64))
+        let appIcon = drawAppIcon(pixelSize: 1024)
+        let menuBarIcon = drawMenuBarTemplate(pixelSize: 64)
 
         try writePNG(appIcon, to: outputDirectory.appendingPathComponent("TermCIcon-1024.png"))
         try writePNG(menuBarIcon, to: outputDirectory.appendingPathComponent("TermCMenuBarTemplate.png"))
     }
 
-    private static func drawAppIcon(size: CGSize) -> NSImage {
-        let image = NSImage(size: size)
-        image.lockFocus()
-        defer { image.unlockFocus() }
+    private static func drawAppIcon(pixelSize: Int) -> NSBitmapImageRep {
+        drawBitmap(pixelWidth: pixelSize, pixelHeight: pixelSize) { context, bounds in
 
-        guard let context = NSGraphicsContext.current?.cgContext else {
-            return image
-        }
+            context.setShouldAntialias(true)
+            let cornerRadius = bounds.width * 0.19
+            let roundedRect = CGPath(
+                roundedRect: bounds.insetBy(dx: 24, dy: 24),
+                cornerWidth: cornerRadius,
+                cornerHeight: cornerRadius,
+                transform: nil
+            )
 
-        context.setShouldAntialias(true)
-        let bounds = CGRect(origin: .zero, size: size)
-        let cornerRadius = size.width * 0.19
-        let roundedRect = CGPath(
-            roundedRect: bounds.insetBy(dx: 24, dy: 24),
-            cornerWidth: cornerRadius,
-            cornerHeight: cornerRadius,
-            transform: nil
-        )
+            context.saveGState()
+            context.addPath(roundedRect)
+            context.clip()
 
-        context.saveGState()
-        context.addPath(roundedRect)
-        context.clip()
+            let background = CGGradient(
+                colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                colors: [
+                    NSColor(calibratedRed: 0.03, green: 0.04, blue: 0.05, alpha: 1).cgColor,
+                    NSColor(calibratedRed: 0.10, green: 0.12, blue: 0.13, alpha: 1).cgColor
+                ] as CFArray,
+                locations: [0, 1]
+            )
+            if let background {
+                context.drawLinearGradient(
+                    background,
+                    start: CGPoint(x: bounds.minX, y: bounds.maxY),
+                    end: CGPoint(x: bounds.maxX, y: bounds.minY),
+                    options: []
+                )
+            }
 
-        let background = CGGradient(
-            colorsSpace: CGColorSpaceCreateDeviceRGB(),
-            colors: [
-                NSColor(calibratedRed: 0.03, green: 0.04, blue: 0.05, alpha: 1).cgColor,
-                NSColor(calibratedRed: 0.10, green: 0.12, blue: 0.13, alpha: 1).cgColor
-            ] as CFArray,
-            locations: [0, 1]
-        )
-        if let background {
-            context.drawLinearGradient(
-                background,
-                start: CGPoint(x: bounds.minX, y: bounds.maxY),
-                end: CGPoint(x: bounds.maxX, y: bounds.minY),
-                options: []
+            context.setStrokeColor(NSColor(calibratedWhite: 1, alpha: 0.08).cgColor)
+            context.setLineWidth(8)
+            context.addPath(roundedRect)
+            context.strokePath()
+            context.restoreGState()
+
+            drawTerminalPrompt(in: bounds)
+            drawHexagram(
+                in: CGRect(
+                    x: bounds.width * 0.79,
+                    y: bounds.height * 0.76,
+                    width: bounds.width * 0.10,
+                    height: bounds.height * 0.10
+                ),
+                color: .white,
+                lineWidth: bounds.width * 0.010
             )
         }
-
-        context.setStrokeColor(NSColor(calibratedWhite: 1, alpha: 0.08).cgColor)
-        context.setLineWidth(8)
-        context.addPath(roundedRect)
-        context.strokePath()
-        context.restoreGState()
-
-        drawTerminalPrompt(in: bounds)
-        drawHexagram(
-            in: CGRect(x: size.width * 0.62, y: size.height * 0.60, width: size.width * 0.22, height: size.height * 0.22),
-            color: .white,
-            lineWidth: size.width * 0.018
-        )
-
-        return image
     }
 
-    private static func drawMenuBarTemplate(size: CGSize) -> NSImage {
-        let image = NSImage(size: size)
-        image.lockFocus()
-        defer { image.unlockFocus() }
+    private static func drawMenuBarTemplate(pixelSize: Int) -> NSBitmapImageRep {
+        drawBitmap(pixelWidth: pixelSize, pixelHeight: pixelSize) { _, bounds in
+            drawHexagram(
+                in: CGRect(x: bounds.width * 0.12, y: bounds.height * 0.12, width: bounds.width * 0.76, height: bounds.height * 0.76),
+                color: .white,
+                lineWidth: bounds.width * 0.085
+            )
+        }
+    }
 
-        drawHexagram(
-            in: CGRect(x: size.width * 0.12, y: size.height * 0.12, width: size.width * 0.76, height: size.height * 0.76),
-            color: .white,
-            lineWidth: size.width * 0.085
-        )
+    private static func drawBitmap(
+        pixelWidth: Int,
+        pixelHeight: Int,
+        draw: (CGContext, CGRect) -> Void
+    ) -> NSBitmapImageRep {
+        guard
+            let bitmap = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: pixelWidth,
+                pixelsHigh: pixelHeight,
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0
+            ),
+            let graphicsContext = NSGraphicsContext(bitmapImageRep: bitmap)
+        else {
+            preconditionFailure("Unable to create bitmap context for icon generation")
+        }
 
-        image.isTemplate = true
-        return image
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = graphicsContext
+        defer { NSGraphicsContext.restoreGraphicsState() }
+
+        let context = graphicsContext.cgContext
+        let bounds = CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight)
+        context.clear(bounds)
+        draw(context, bounds)
+
+        return bitmap
     }
 
     private static func drawTerminalPrompt(in bounds: CGRect) {
@@ -155,12 +182,8 @@ enum IconGenerator {
         context.strokePath()
     }
 
-    private static func writePNG(_ image: NSImage, to url: URL) throws {
-        guard
-            let tiffData = image.tiffRepresentation,
-            let bitmap = NSBitmapImageRep(data: tiffData),
-            let pngData = bitmap.representation(using: .png, properties: [:])
-        else {
+    private static func writePNG(_ bitmap: NSBitmapImageRep, to url: URL) throws {
+        guard let pngData = bitmap.representation(using: .png, properties: [:]) else {
             throw CocoaError(.fileWriteUnknown)
         }
 
