@@ -40,6 +40,8 @@ struct TerminalView: NSViewRepresentable {
         guard coordinator.renderedTranscript != transcript else { return }
 
         coordinator.renderedTranscript = transcript
+        terminalView.getTerminal().resetToInitialState()
+        configure(terminalView)
         terminalView.feed(text: "\u{1b}[2J\u{1b}[3J\u{1b}[H")
         terminalView.feed(text: transcript.normalizedTerminalLineEndings)
     }
