@@ -13,15 +13,7 @@ struct TerminalWorkspaceView: View {
         VStack(spacing: 0) {
             tabStrip
 
-            ScrollView {
-                Text(selectedTab?.transcript ?? "")
-                    .font(.system(size: 14, design: .monospaced))
-                    .foregroundStyle(Color(red: 0.45, green: 1.0, blue: 0.55))
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .padding(18)
-                    .textSelection(.enabled)
-            }
-            .background(Color.black)
+            TerminalView(transcript: selectedTab?.transcript ?? "")
         }
         .background(Color.black)
     }
