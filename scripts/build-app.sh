@@ -11,13 +11,21 @@ RESOURCES_DIR="$CONTENTS_DIR/Resources"
 cd "$ROOT_DIR"
 scripts/generate-icons.sh
 swift build -c debug --product TermCApp
+SWIFT_BUILD_BIN_DIR="$(swift build -c debug --show-bin-path)"
+SWIFT_BUILD_BIN_DIR="$(cd "$SWIFT_BUILD_BIN_DIR" && pwd -P)"
+TERMC_EXECUTABLE="$SWIFT_BUILD_BIN_DIR/TermCApp"
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
-cp ".build/debug/TermCApp" "$MACOS_DIR/TermC"
+cp "$TERMC_EXECUTABLE" "$MACOS_DIR/TermC"
 cp "$BUILD_DIR/icons/TermCIcon-1024.png" "$RESOURCES_DIR/TermCIcon-1024.png"
 cp "$BUILD_DIR/icons/TermCIcon.icns" "$RESOURCES_DIR/TermCIcon.icns"
 cp "$BUILD_DIR/icons/TermCMenuBarTemplate.png" "$RESOURCES_DIR/TermCMenuBarTemplate.png"
+
+for bundle in "$SWIFT_BUILD_BIN_DIR"/*.bundle; do
+    [ -d "$bundle" ] || continue
+    cp -R "$bundle" "$RESOURCES_DIR/"
+done
 
 cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

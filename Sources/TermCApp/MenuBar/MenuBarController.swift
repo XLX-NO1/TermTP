@@ -10,8 +10,7 @@ final class MenuBarController {
         }
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = NSImage(named: "TermCMenuBarTemplate")
-        item.button?.image?.isTemplate = true
+        item.button?.image = Self.makeMenuBarTemplateImage()
         item.button?.toolTip = "TermC"
 
         let menu = NSMenu()
@@ -65,5 +64,47 @@ final class MenuBarController {
 
     @objc private func quitTermC() {
         NSApp.terminate(nil)
+    }
+
+    static func makeMenuBarTemplateImage() -> NSImage {
+        if let image = NSImage(named: "TermCMenuBarTemplate") {
+            image.isTemplate = true
+            return image
+        }
+
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        defer {
+            image.unlockFocus()
+            image.isTemplate = true
+        }
+
+        NSColor.black.setStroke()
+        let path = NSBezierPath()
+        path.lineWidth = 1.8
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+
+        let topTriangle = [
+            NSPoint(x: 9, y: 15),
+            NSPoint(x: 3.8, y: 6),
+            NSPoint(x: 14.2, y: 6)
+        ]
+        let bottomTriangle = [
+            NSPoint(x: 9, y: 3),
+            NSPoint(x: 3.8, y: 12),
+            NSPoint(x: 14.2, y: 12)
+        ]
+
+        for triangle in [topTriangle, bottomTriangle] {
+            path.move(to: triangle[0])
+            path.line(to: triangle[1])
+            path.line(to: triangle[2])
+            path.close()
+        }
+
+        path.stroke()
+        return image
     }
 }

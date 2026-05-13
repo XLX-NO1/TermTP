@@ -1,6 +1,14 @@
 import Testing
 @testable import TermCApp
 
+@MainActor
+@Test func menuBarTemplateImageFallsBackWhenResourceIsMissing() {
+    let image = MenuBarController.makeMenuBarTemplateImage()
+
+    #expect(image.size == .init(width: 18, height: 18))
+    #expect(image.isTemplate)
+}
+
 @Test func saveDraftConnectionRejectsPortZero() {
     let state = AppState(connections: [])
     state.draftHost = "example.com"
