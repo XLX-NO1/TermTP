@@ -55,26 +55,27 @@ enum IconGenerator {
             context.strokePath()
             context.restoreGState()
 
-            drawTerminalPrompt(in: bounds)
-            drawHexagram(
+            drawMagicHexagram(
                 in: CGRect(
-                    x: bounds.width * 0.42,
-                    y: bounds.height * 0.43,
-                    width: bounds.width * 0.36,
-                    height: bounds.height * 0.36
+                    x: bounds.width * 0.19,
+                    y: bounds.height * 0.19,
+                    width: bounds.width * 0.62,
+                    height: bounds.height * 0.62
                 ),
                 color: .white,
-                lineWidth: bounds.width * 0.017
+                lineWidth: bounds.width * 0.014,
+                drawsTerminalPrompt: true
             )
         }
     }
 
     private static func drawMenuBarTemplate(pixelSize: Int) -> NSBitmapImageRep {
         drawBitmap(pixelWidth: pixelSize, pixelHeight: pixelSize) { _, bounds in
-            drawHexagram(
+            drawMagicHexagram(
                 in: CGRect(x: bounds.width * 0.12, y: bounds.height * 0.12, width: bounds.width * 0.76, height: bounds.height * 0.76),
                 color: .white,
-                lineWidth: bounds.width * 0.085
+                lineWidth: bounds.width * 0.075,
+                drawsTerminalPrompt: false
             )
         }
     }
@@ -114,36 +115,41 @@ enum IconGenerator {
         return bitmap
     }
 
-    private static func drawTerminalPrompt(in bounds: CGRect) {
+    private static func drawTerminalPrompt(in rect: CGRect) {
         let prompt = ">_"
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.alignment = .center
 
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: bounds.width * 0.31, weight: .bold),
+            .font: NSFont.monospacedSystemFont(ofSize: rect.width * 0.20, weight: .bold),
             .foregroundColor: NSColor.white,
             .paragraphStyle: paragraphStyle
         ]
 
         let textSize = prompt.size(withAttributes: attributes)
         let textRect = CGRect(
-            x: bounds.midX - textSize.width / 2 - bounds.width * 0.10,
-            y: bounds.midY - textSize.height / 2 - bounds.height * 0.06,
+            x: rect.midX - textSize.width / 2,
+            y: rect.midY - textSize.height / 2 - rect.height * 0.015,
             width: textSize.width,
             height: textSize.height
         )
         prompt.draw(in: textRect, withAttributes: attributes)
     }
 
-    private static func drawHexagram(in rect: CGRect, color: NSColor, lineWidth: CGFloat) {
+    private static func drawMagicHexagram(
+        in rect: CGRect,
+        color: NSColor,
+        lineWidth: CGFloat,
+        drawsTerminalPrompt: Bool
+    ) {
         guard let context = NSGraphicsContext.current?.cgContext else {
             return
         }
 
         let center = CGPoint(x: rect.midX, y: rect.midY)
         let radius = min(rect.width, rect.height) / 2
-        let upward = trianglePoints(center: center, radius: radius, rotation: -.pi / 2)
-        let downward = trianglePoints(center: center, radius: radius, rotation: .pi / 2)
+        let upward = trianglePoints(center: center, radius: radius * 0.86, rotation: -.pi / 2)
+        let downward = trianglePoints(center: center, radius: radius * 0.86, rotation: .pi / 2)
 
         context.saveGState()
         context.setShouldAntialias(true)
@@ -162,18 +168,17 @@ enum IconGenerator {
         strokePolygon(upward, in: context)
         strokePolygon(downward, in: context)
 
-        let centerDotRadius = radius * 0.13
-        context.setFillColor(color.cgColor)
-        context.fillEllipse(
-            in: CGRect(
-                x: center.x - centerDotRadius,
-                y: center.y - centerDotRadius,
-                width: centerDotRadius * 2,
-                height: centerDotRadius * 2
-            )
-        )
+        context.setLineWidth(lineWidth * 0.55)
+        strokeCircle(center: center, radius: radius * 0.67, in: context)
+        strokeCircle(center: center, radius: radius * 0.34, in: context)
+        drawPortalTicks(center: center, radius: radius, color: color, lineWidth: lineWidth * 0.55, in: context)
+        drawPortalNodes(center: center, radius: radius * 0.67, color: color, lineWidth: lineWidth, in: context)
 
         context.restoreGState()
+
+        if drawsTerminalPrompt {
+            drawTerminalPrompt(in: rect)
+        }
     }
 
     private static func trianglePoints(center: CGPoint, radius: CGFloat, rotation: CGFloat) -> [CGPoint] {
@@ -198,6 +203,76 @@ enum IconGenerator {
         }
         context.closePath()
         context.strokePath()
+    }
+
+    private static func strokeCircle(center: CGPoint, radius: CGFloat, in context: CGContext) {
+        context.strokeEllipse(
+            in: CGRect(
+                x: center.x - radius,
+                y: center.y - radius,
+                width: radius * 2,
+                height: radius * 2
+            )
+        )
+    }
+
+    private static func drawPortalTicks(
+        center: CGPoint,
+        radius: CGFloat,
+        color: NSColor,
+        lineWidth: CGFloat,
+        in context: CGContext
+    ) {
+        context.saveGState()
+        context.setStrokeColor(color.cgColor)
+        context.setLineWidth(lineWidth)
+
+        for index in 0..<24 {
+            let angle = CGFloat(index) * 2 * .pi / 24
+            let isMajorTick = index % 4 == 0
+            let outer = point(center: center, radius: radius * 0.98, angle: angle)
+            let inner = point(center: center, radius: radius * (isMajorTick ? 0.88 : 0.92), angle: angle)
+            context.beginPath()
+            context.move(to: outer)
+            context.addLine(to: inner)
+            context.strokePath()
+        }
+
+        context.restoreGState()
+    }
+
+    private static func drawPortalNodes(
+        center: CGPoint,
+        radius: CGFloat,
+        color: NSColor,
+        lineWidth: CGFloat,
+        in context: CGContext
+    ) {
+        context.saveGState()
+        context.setFillColor(color.cgColor)
+
+        for index in 0..<6 {
+            let angle = -.pi / 2 + CGFloat(index) * 2 * .pi / 6
+            let nodeCenter = point(center: center, radius: radius, angle: angle)
+            let nodeRadius = lineWidth * 1.55
+            context.fillEllipse(
+                in: CGRect(
+                    x: nodeCenter.x - nodeRadius,
+                    y: nodeCenter.y - nodeRadius,
+                    width: nodeRadius * 2,
+                    height: nodeRadius * 2
+                )
+            )
+        }
+
+        context.restoreGState()
+    }
+
+    private static func point(center: CGPoint, radius: CGFloat, angle: CGFloat) -> CGPoint {
+        CGPoint(
+            x: center.x + cos(angle) * radius,
+            y: center.y + sin(angle) * radius
+        )
     }
 
     private static func writePNG(_ bitmap: NSBitmapImageRep, to url: URL) throws {
