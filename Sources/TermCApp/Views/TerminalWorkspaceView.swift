@@ -4,6 +4,8 @@ import TermCCore
 struct TerminalWorkspaceView: View {
     let tabs: [TerminalTab]
     @Binding var selectedTabID: TerminalTab.ID?
+    var onCloseTab: (TerminalTab.ID) -> Void = { _ in }
+    var onTerminalInput: (String) -> Void = { _ in }
 
     private var selectedTab: TerminalTab? {
         tabs.first { $0.id == selectedTabID } ?? tabs.first
@@ -13,9 +15,32 @@ struct TerminalWorkspaceView: View {
         VStack(spacing: 0) {
             tabStrip
 
-            TerminalView(transcript: selectedTab?.transcript ?? "")
+            terminalStack
         }
         .background(Color.black)
+    }
+
+    private var terminalStack: some View {
+        ZStack {
+            ForEach(tabs) { tab in
+                terminalContent(for: tab)
+                    .opacity(tab.id == selectedTab?.id ? 1 : 0)
+                    .allowsHitTesting(tab.id == selectedTab?.id)
+                    .accessibilityHidden(tab.id != selectedTab?.id)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func terminalContent(for tab: TerminalTab) -> some View {
+        if case .ssh(let connection, let credential) = tab.localProcess {
+            LocalSSHTerminalView(connection: connection, credential: credential)
+        } else {
+            TerminalView(
+                transcript: tab.transcript,
+                onInput: onTerminalInput
+            )
+        }
     }
 
     private var tabStrip: some View {
@@ -42,6 +67,12 @@ struct TerminalWorkspaceView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    Button("Close") {
+                        onCloseTab(tab.id)
+                    }
+                    .disabled(tabs.count <= 1)
+                }
             }
 
             Spacer(minLength: 0)

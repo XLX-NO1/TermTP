@@ -4,9 +4,10 @@ import SwiftUI
 
 struct TerminalView: NSViewRepresentable {
     var transcript: String
+    var onInput: (String) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(onInput: onInput)
     }
 
     func makeNSView(context: Context) -> SwiftTerm.TerminalView {
@@ -19,6 +20,7 @@ struct TerminalView: NSViewRepresentable {
 
     func updateNSView(_ terminalView: SwiftTerm.TerminalView, context: Context) {
         configure(terminalView)
+        context.coordinator.onInput = onInput
         context.coordinator.updateTranscript(transcript, in: terminalView, configure: configure)
     }
 
@@ -38,10 +40,15 @@ struct TerminalView: NSViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, @MainActor TerminalViewDelegate {
+        var onInput: (String) -> Void
         private var currentTranscript = ""
         private var renderedTranscript: String?
         private var renderedColumns: Int?
         private var configureTerminalView: (@MainActor (SwiftTerm.TerminalView) -> Void)?
+
+        init(onInput: @escaping (String) -> Void) {
+            self.onInput = onInput
+        }
 
         @MainActor
         func updateTranscript(
@@ -62,7 +69,12 @@ struct TerminalView: NSViewRepresentable {
 
         func setTerminalTitle(source: SwiftTerm.TerminalView, title: String) {}
         func hostCurrentDirectoryUpdate(source: SwiftTerm.TerminalView, directory: String?) {}
-        func send(source: SwiftTerm.TerminalView, data: ArraySlice<UInt8>) {}
+        func send(source: SwiftTerm.TerminalView, data: ArraySlice<UInt8>) {
+            guard let input = String(bytes: data, encoding: .utf8) else {
+                return
+            }
+            onInput(input)
+        }
         func scrolled(source: SwiftTerm.TerminalView, position: Double) {}
         func rangeChanged(source: SwiftTerm.TerminalView, startY: Int, endY: Int) {}
 

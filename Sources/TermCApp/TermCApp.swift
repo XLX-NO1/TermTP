@@ -9,15 +9,12 @@ struct TermCApp: App {
         WindowGroup("TermTP") {
             RootView(state: state)
                 .frame(
-                    width: AppLayout.defaultWindowWidth,
-                    height: AppLayout.defaultWindowHeight
-                )
-                .frame(
                     minWidth: AppLayout.minimumWindowWidth,
                     minHeight: AppLayout.minimumWindowHeight
                 )
                 .task {
                     menuBarController.install(state: state)
+                    await state.loadConnections()
                 }
         }
         .windowStyle(.hiddenTitleBar)

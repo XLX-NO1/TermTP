@@ -37,9 +37,14 @@ public enum SSHHostKeyPolicy: Equatable, Sendable {
 
 public struct CitadelSSHClient: SSHClientProviding {
     private let hostKeyPolicy: SSHHostKeyPolicy
+    private let hostKeyTrustStore: (any HostKeyTrusting)?
 
-    public init(hostKeyPolicy: SSHHostKeyPolicy = .strict) {
+    public init(
+        hostKeyPolicy: SSHHostKeyPolicy = .strict,
+        hostKeyTrustStore: (any HostKeyTrusting)? = nil
+    ) {
         self.hostKeyPolicy = hostKeyPolicy
+        self.hostKeyTrustStore = hostKeyTrustStore
     }
 
     public func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
@@ -47,7 +52,7 @@ public struct CitadelSSHClient: SSHClientProviding {
             host: record.host,
             port: Int(record.port),
             authenticationMethod: try authenticationMethod(for: record, credential: credential),
-            hostKeyValidator: try makeHostKeyValidator(),
+            hostKeyValidator: try makeHostKeyValidator(for: record),
             reconnect: .never
         )
 
@@ -84,10 +89,17 @@ public struct CitadelSSHClient: SSHClientProviding {
         }
     }
 
-    func makeHostKeyValidator() throws -> SSHHostKeyValidator {
+    func makeHostKeyValidator(for record: ConnectionRecord? = nil) throws -> SSHHostKeyValidator {
         switch hostKeyPolicy {
         case .strict:
-            throw SSHClientAdapterError.hostKeyVerificationRequired
+            guard let record, let hostKeyTrustStore else {
+                throw SSHClientAdapterError.hostKeyVerificationRequired
+            }
+            return .custom(PromptingHostKeyValidator(
+                host: record.host,
+                port: record.port,
+                store: hostKeyTrustStore
+            ))
         case .insecureAcceptAnyHostKey:
             return .acceptAnything()
         }
@@ -123,6 +135,10 @@ public actor CitadelSSHSession: SSHSessionProviding {
 
     public var state: SSHSessionState {
         currentState
+    }
+
+    public nonisolated var client: SSHClient {
+        clientBox.client
     }
 
     public func send(_ input: String) async throws {

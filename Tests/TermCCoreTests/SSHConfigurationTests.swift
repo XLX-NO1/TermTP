@@ -34,4 +34,22 @@ final class SSHConfigurationTests: XCTestCase {
     func testInsecureHostKeyPolicyIsExplicitOptIn() throws {
         _ = try CitadelSSHClient(hostKeyPolicy: .insecureAcceptAnyHostKey).makeHostKeyValidator()
     }
+
+    func testHostKeyTrustStoreRecordsPromptAndSavesTrustedKey() async throws {
+        let store = InMemoryHostKeyTrustStore(trustNewHosts: true)
+        let prompt = HostKeyPrompt(
+            host: "example.com",
+            port: 22,
+            key: "ssh-ed25519 AAAA",
+            fingerprint: "SHA256:test"
+        )
+
+        let trusted = await store.requestTrust(for: prompt)
+        let prompts = await store.prompts
+        let trustedKey = await store.trustedKey(host: "example.com", port: 22)
+
+        XCTAssertTrue(trusted)
+        XCTAssertEqual(prompts, [prompt])
+        XCTAssertEqual(trustedKey, "ssh-ed25519 AAAA")
+    }
 }

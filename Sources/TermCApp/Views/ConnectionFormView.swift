@@ -9,10 +9,12 @@ struct ConnectionFormView: View {
         let host = state.draftHost.trimmingCharacters(in: .whitespacesAndNewlines)
         let username = state.draftUsername.trimmingCharacters(in: .whitespacesAndNewlines)
         let privateKeyPath = state.draftPrivateKeyPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let password = state.draftPassword.trimmingCharacters(in: .whitespacesAndNewlines)
 
         return port.map { $0 > 0 } ?? false
             && !host.isEmpty
             && !username.isEmpty
+            && (state.draftUsesKey || !password.isEmpty)
             && (!state.draftUsesKey || !privateKeyPath.isEmpty)
     }
 
@@ -32,6 +34,9 @@ struct ConnectionFormView: View {
 
                 if state.draftUsesKey {
                     TextField("Private key path", text: $state.draftPrivateKeyPath)
+                    SecureField("Private key passphrase", text: $state.draftPrivateKeyPassphrase)
+                } else {
+                    SecureField("Password", text: $state.draftPassword)
                 }
             }
             .formStyle(.grouped)
@@ -45,8 +50,10 @@ struct ConnectionFormView: View {
                 }
                 .keyboardShortcut(.cancelAction)
 
-                Button("Save") {
-                    state.saveDraftConnection()
+                Button("Connect") {
+                    Task {
+                        await state.connectDraftConnection()
+                    }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(!canSave)

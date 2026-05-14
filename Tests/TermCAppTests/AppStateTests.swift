@@ -21,6 +21,7 @@ import TermCCore
     #expect(normalized.isTemplate)
 }
 
+@MainActor
 @Test func saveDraftConnectionRejectsPortZero() {
     let state = AppState(connections: [])
     state.draftHost = "example.com"
@@ -32,6 +33,7 @@ import TermCCore
     #expect(state.connections.isEmpty)
 }
 
+@MainActor
 @Test func saveDraftConnectionRejectsEmptyPrivateKeyPath() {
     let state = AppState(connections: [])
     state.draftHost = "example.com"
@@ -45,16 +47,429 @@ import TermCCore
     #expect(state.connections.isEmpty)
 }
 
-@Test func refreshRemoteFilesListsArchiveAndLogsUnderCurrentRemotePath() {
-    let state = AppState()
-    state.remotePath = "/srv/app"
+@MainActor
+@Test func beginNewConnectionLeavesUsernameEmpty() {
+    let state = AppState(connections: [])
 
-    state.refreshRemoteFiles()
+    state.beginNewConnection()
+
+    #expect(state.draftUsername == "")
+}
+
+@MainActor
+@Test func connectDraftConnectionCreatesConnectedTabAndLoadsRemoteFiles() async {
+    let sftpService = RecordingSFTPService(filesByPath: [
+        ".": [RemoteFile(name: "readme.txt", path: "./readme.txt", kind: .file, size: 12)]
+    ])
+    let state = AppState(connections: [], sshClient: FakeSSHClient(), sftpService: sftpService)
+    state.draftAlias = "Prod"
+    state.draftHost = "example.com"
+    state.draftPort = "22"
+    state.draftUsername = "deploy"
+    state.draftPassword = "secret"
+
+    await state.connectDraftConnection()
+
+    #expect(state.connections.count == 1)
+    #expect(state.tabs.count == 2)
+    #expect(state.tabs.last?.title == "Prod")
+    #expect(state.tabs.last?.state == .connected)
+    #expect(state.tabs.last?.transcript.contains("Connected to deploy@example.com:22") == true)
+    #expect(state.tabs.last?.localProcess == .ssh(state.connections[0], credential: .password("secret")))
+    #expect(state.selectedTabID == state.tabs.last?.id)
+    #expect(state.remotePath == ".")
+    #expect(state.remoteFiles == [RemoteFile(name: "readme.txt", path: "./readme.txt", kind: .file, size: 12)])
+    #expect(await sftpService.listedPaths == ["."])
+}
+
+@MainActor
+@Test func trustedHostKeyIsRememberedForNextConnection() async {
+    let state = AppState(connections: [])
+    let prompt = HostKeyPrompt(host: "example.com", port: 22, key: "ssh-ed25519 AAAATEST", fingerprint: "SHA256:test")
+
+    Task {
+        _ = await state.hostKeyTrustStore.requestTrust(for: prompt)
+    }
+    await Task.yield()
+    state.trustPendingHostKey()
+
+    #expect(await state.hostKeyTrustStore.trustedKey(host: "example.com", port: 22) == "ssh-ed25519 AAAATEST")
+}
+
+@MainActor
+@Test func connectDraftConnectionFailsAfterTimeout() async {
+    let state = AppState(
+        connections: [],
+        sshClient: HangingSSHClient(),
+        connectionTimeoutSeconds: 0.01
+    )
+    state.draftAlias = "Slow"
+    state.draftHost = "example.com"
+    state.draftPort = "22"
+    state.draftUsername = "deploy"
+    state.draftPassword = "secret"
+
+    await state.connectDraftConnection()
+
+    #expect(state.tabs.last?.state == .failed("Connection timed out after 0.01 seconds"))
+    #expect(state.tabs.last?.transcript.contains("Connection timed out after 0.01 seconds") == true)
+}
+
+@MainActor
+@Test func refreshRemoteFilesListsCurrentRemotePathThroughSFTP() async {
+    let service = FakeSFTPService()
+    let state = AppState(
+        tabs: [TerminalTab(
+            title: "Connected",
+            state: .connected,
+            transcript: "",
+            session: FakeSSHSession(record: .samplePassword)
+        )],
+        connections: [],
+        sftpService: service
+    )
+    state.remotePath = "/srv/app"
+    state.selectedTabID = state.tabs[0].id
+
+    try? await service.makeDirectory(remotePath: "/srv", session: state.tabs[0].session!)
+    try? await service.makeDirectory(remotePath: "/srv/app", session: state.tabs[0].session!)
+    try? await service.upload(localPath: "/tmp/release.tgz", remotePath: "/srv/app/release.tgz", session: state.tabs[0].session!)
+    try? await service.makeDirectory(remotePath: "/srv/app/logs", session: state.tabs[0].session!)
+
+    await state.refreshRemoteFiles()
 
     #expect(state.remoteFiles == [
-        RemoteFile(name: "app.tar.gz", path: "/srv/app/app.tar.gz", kind: .file, size: 2048),
-        RemoteFile(name: "logs", path: "/srv/app/logs", kind: .directory, size: 0)
+        RemoteFile(name: "logs", path: "/srv/app/logs", kind: .directory, size: 0),
+        RemoteFile(name: "release.tgz", path: "/srv/app/release.tgz", kind: .file, size: 1)
     ])
+}
+
+@MainActor
+@Test func openRemoteDirectoryChangesPathAndListsChildren() async {
+    let service = FakeSFTPService()
+    let session = FakeSSHSession(record: .samplePassword)
+    let state = AppState(
+        tabs: [TerminalTab(title: "Connected", state: .connected, transcript: "", session: session)],
+        connections: [],
+        sftpService: service
+    )
+    state.selectedTabID = state.tabs[0].id
+
+    try? await service.upload(localPath: "/tmp/app.log", remotePath: "/var/www/logs/app.log", session: session)
+
+    await state.openRemoteDirectory(RemoteFile(name: "logs", path: "/var/www/logs", kind: .directory, size: 0))
+
+    #expect(state.remotePath == "/var/www/logs")
+    #expect(state.remoteFiles == [
+        RemoteFile(name: "app.log", path: "/var/www/logs/app.log", kind: .file, size: 1)
+    ])
+}
+
+@MainActor
+@Test func openRemoteParentDirectoryReturnsToParentPath() async {
+    let service = FakeSFTPService()
+    let session = FakeSSHSession(record: .samplePassword)
+    let state = AppState(
+        tabs: [TerminalTab(title: "Connected", state: .connected, transcript: "", session: session)],
+        connections: [],
+        sftpService: service
+    )
+    state.selectedTabID = state.tabs[0].id
+    state.remotePath = "/var/www/logs"
+
+    await state.openRemoteParentDirectory()
+
+    #expect(state.remotePath == "/var/www")
+}
+
+@MainActor
+@Test func openRemotePathUpdatesPathAndListsChildren() async {
+    let service = FakeSFTPService()
+    let session = FakeSSHSession(record: .samplePassword)
+    let state = AppState(
+        tabs: [TerminalTab(title: "Connected", state: .connected, transcript: "", session: session)],
+        connections: [],
+        sftpService: service
+    )
+    state.selectedTabID = state.tabs[0].id
+    try? await service.makeDirectory(remotePath: "/var/www/cache", session: session)
+    try? await service.upload(localPath: "/tmp/data.json", remotePath: "/var/www/cache/data.json", session: session)
+
+    await state.openRemotePath(" /var/www/cache ")
+
+    #expect(state.remotePath == "/var/www/cache")
+    #expect(state.remoteFiles == [
+        RemoteFile(name: "data.json", path: "/var/www/cache/data.json", kind: .file, size: 1)
+    ])
+}
+
+@MainActor
+@Test func closeTabSelectsNeighborAndKeepsAtLeastOneTab() {
+    let first = TerminalTab(title: "First", state: .connected, transcript: "")
+    let second = TerminalTab(title: "Second", state: .connected, transcript: "")
+    let state = AppState(tabs: [first, second], connections: [])
+    state.selectedTabID = second.id
+
+    state.closeTab(second.id)
+
+    #expect(state.tabs == [first])
+    #expect(state.selectedTabID == first.id)
+
+    state.closeTab(first.id)
+
+    #expect(state.tabs == [first])
+    #expect(state.selectedTabID == first.id)
+}
+
+@MainActor
+@Test func clearHistoryKeepsFavorites() {
+    var favorite = ConnectionRecord.samplePassword
+    favorite.isFavorite = true
+    let history = ConnectionRecord(
+        alias: "History",
+        host: "history.example.com",
+        username: "deploy",
+        authentication: .password
+    )
+    let state = AppState(connections: [favorite, history])
+
+    state.clearHistory()
+
+    #expect(state.connections == [favorite])
+}
+
+@MainActor
+@Test func loadAndPersistConnectionsKeepsHistoryAndFavoritesAcrossLaunches() async {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension("json")
+    let store = ConnectionStore(fileURL: url)
+    var favorite = ConnectionRecord.samplePassword
+    favorite.isFavorite = true
+
+    let firstLaunch = AppState(connections: [], connectionStore: store)
+    firstLaunch.connections = [favorite]
+    await firstLaunch.persistConnections()
+
+    let secondLaunch = AppState(connections: [], connectionStore: store)
+    await secondLaunch.loadConnections()
+
+    #expect(secondLaunch.connections == [favorite])
+    #expect(secondLaunch.favoriteConnections == [favorite])
+}
+
+@MainActor
+@Test func deleteConnectionRemovesMatchingConnection() {
+    let first = ConnectionRecord.samplePassword
+    let second = ConnectionRecord(
+        alias: "Delete Me",
+        host: "delete.example.com",
+        username: "deploy",
+        authentication: .password
+    )
+    let state = AppState(connections: [first, second])
+
+    state.deleteConnection(second.id)
+
+    #expect(state.connections == [first])
+}
+
+@MainActor
+@Test func deleteHistoryConnectionDoesNotDeleteFavoriteConnection() {
+    var favorite = ConnectionRecord.samplePassword
+    favorite.isFavorite = true
+    let state = AppState(connections: [favorite])
+
+    state.deleteHistoryConnection(favorite.id)
+
+    #expect(state.connections == [favorite])
+}
+
+@MainActor
+@Test func toggleFavoriteUpdatesConnection() {
+    let connection = ConnectionRecord.samplePassword
+    let state = AppState(connections: [connection])
+
+    state.toggleFavorite(connection.id)
+
+    #expect(state.connections.first?.isFavorite == true)
+
+    state.toggleFavorite(connection.id)
+
+    #expect(state.connections.first?.isFavorite == false)
+}
+
+@MainActor
+@Test func historyConnectionsExcludeFavorites() {
+    var favorite = ConnectionRecord.samplePassword
+    favorite.isFavorite = true
+    let history = ConnectionRecord(
+        alias: "History",
+        host: "history.example.com",
+        username: "deploy",
+        authentication: .password
+    )
+    let state = AppState(connections: [favorite, history])
+
+    #expect(state.favoriteConnections == [favorite])
+    #expect(state.historyConnections == [history])
+}
+
+@MainActor
+@Test func sendInputAppendsToSelectedTabTranscript() {
+    let tab = TerminalTab(title: "Shell", state: .connected, transcript: "$ ")
+    let state = AppState(tabs: [tab], connections: [])
+    state.selectedTabID = tab.id
+
+    state.sendInputToSelectedTab("ls\n")
+
+    #expect(state.tabs.first?.transcript == "$ ls\n")
+}
+
+@MainActor
+@Test func uploadAndDownloadCreateCompletedTransfers() async {
+    let state = AppState(
+        tabs: [TerminalTab(
+            title: "Connected",
+            state: .connected,
+            transcript: "",
+            session: FakeSSHSession(record: .samplePassword)
+        )],
+        connections: [],
+        sftpService: FakeSFTPService()
+    )
+    state.selectedTabID = state.tabs[0].id
+    state.remotePath = "/var/www"
+
+    await state.uploadFile(localPath: "/tmp/local.txt")
+    await state.downloadFile(remoteFile: RemoteFile(
+        name: "local.txt",
+        path: "/var/www/local.txt",
+        kind: .file,
+        size: 1
+    ), localPath: "/tmp/local.txt")
+
+    #expect(state.transfers.count == 2)
+    #expect(state.transfers.allSatisfy { $0.state == TransferRecord.State.completed })
+    #expect(state.remoteFiles.contains { $0.path == "/var/www/local.txt" })
+}
+
+@MainActor
+@Test func downloadFileResumesFromExistingLocalBytesAndTracksProgress() async throws {
+    let localURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension("bin")
+    try Data(repeating: 0, count: 3).write(to: localURL)
+    let state = AppState(
+        tabs: [TerminalTab(
+            title: "Connected",
+            state: .connected,
+            transcript: "",
+            session: FakeSSHSession(record: .samplePassword)
+        )],
+        connections: [],
+        sftpService: ProgressRecordingSFTPService(totalBytes: 10)
+    )
+    state.selectedTabID = state.tabs[0].id
+
+    await state.downloadFile(
+        remoteFile: RemoteFile(name: "archive.tgz", path: "/tmp/archive.tgz", kind: .file, size: 10),
+        localPath: localURL.path
+    )
+
+    #expect(state.transfers.count == 1)
+    #expect(state.transfers[0].bytesCompleted == 10)
+    #expect(state.transfers[0].totalBytes == 10)
+    #expect(state.transfers[0].state == .completed)
+}
+
+@MainActor
+@Test func uploadFileToRemoteDirectoryUsesThatDirectory() async {
+    let session = FakeSSHSession(record: .samplePassword)
+    let service = FakeSFTPService()
+    let state = AppState(
+        tabs: [TerminalTab(title: "Connected", state: .connected, transcript: "", session: session)],
+        connections: [],
+        sftpService: service
+    )
+    state.selectedTabID = state.tabs[0].id
+
+    await state.uploadFile(
+        localPath: "/tmp/site.conf",
+        toRemoteDirectory: RemoteFile(name: "logs", path: "/var/www/logs", kind: .directory, size: 0)
+    )
+
+    #expect(state.transfers.first?.remotePath == "/var/www/logs/site.conf")
+    let files = try? await service.list(path: "/var/www/logs", session: session)
+    #expect(files == [
+        RemoteFile(name: "site.conf", path: "/var/www/logs/site.conf", kind: .file, size: 1)
+    ])
+}
+
+private struct HangingSSHClient: SSHClientProviding {
+    func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
+        try await Task.sleep(for: .seconds(60))
+        return FakeSSHSession(record: record)
+    }
+}
+
+private actor RecordingSFTPService: SFTPServicing {
+    private let filesByPath: [String: [RemoteFile]]
+    private(set) var listedPaths: [String] = []
+
+    init(filesByPath: [String: [RemoteFile]]) {
+        self.filesByPath = filesByPath
+    }
+
+    func list(path: String, session: SSHSessionProviding) async throws -> [RemoteFile] {
+        listedPaths.append(path)
+        return filesByPath[path] ?? []
+    }
+
+    func upload(localPath: String, remotePath: String, session: SSHSessionProviding) async throws {}
+
+    func download(remotePath: String, localPath: String, session: SSHSessionProviding) async throws {}
+
+    func download(
+        remotePath: String,
+        localPath: String,
+        resumeFrom offset: Int64,
+        progress: @escaping ProgressHandler,
+        session: SSHSessionProviding
+    ) async throws {}
+
+    func makeDirectory(remotePath: String, session: SSHSessionProviding) async throws {}
+
+    func delete(remotePath: String, session: SSHSessionProviding) async throws {}
+}
+
+private actor ProgressRecordingSFTPService: SFTPServicing {
+    private let totalBytes: Int64
+
+    init(totalBytes: Int64) {
+        self.totalBytes = totalBytes
+    }
+
+    func list(path: String, session: SSHSessionProviding) async throws -> [RemoteFile] { [] }
+
+    func upload(localPath: String, remotePath: String, session: SSHSessionProviding) async throws {}
+
+    func download(remotePath: String, localPath: String, session: SSHSessionProviding) async throws {}
+
+    func download(
+        remotePath: String,
+        localPath: String,
+        resumeFrom offset: Int64,
+        progress: @escaping ProgressHandler,
+        session: SSHSessionProviding
+    ) async throws {
+        await progress(offset, totalBytes)
+        await progress(totalBytes, totalBytes)
+    }
+
+    func makeDirectory(remotePath: String, session: SSHSessionProviding) async throws {}
+
+    func delete(remotePath: String, session: SSHSessionProviding) async throws {}
 }
 
 @Test func welcomeTabUsesTermTPBrandName() {
@@ -63,9 +478,9 @@ import TermCCore
 
 @Test func layoutUsesCompactRightSidebarAndBottomTransferArea() {
     #expect(AppLayout.minimumWindowWidth == 720)
-    #expect(AppLayout.minimumWindowHeight == 460)
+    #expect(AppLayout.minimumWindowHeight == 560)
     #expect(AppLayout.defaultWindowWidth == 760)
-    #expect(AppLayout.defaultWindowHeight == 480)
+    #expect(AppLayout.defaultWindowHeight == 620)
     #expect(AppLayout.connectionSidebarWidth == 190)
-    #expect(AppLayout.transferDrawerHeight == 150)
+    #expect(AppLayout.transferDrawerHeight == 260)
 }

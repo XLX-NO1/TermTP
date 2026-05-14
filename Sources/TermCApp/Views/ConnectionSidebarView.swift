@@ -18,7 +18,11 @@ struct ConnectionSidebarView: View {
     }
 
     private var favorites: [ConnectionRecord] {
-        filteredConnections.filter(\.isFavorite)
+        filteredConnections.filter { state.favoriteConnections.contains($0) }
+    }
+
+    private var history: [ConnectionRecord] {
+        filteredConnections.filter { state.historyConnections.contains($0) }
     }
 
     var body: some View {
@@ -41,17 +45,29 @@ struct ConnectionSidebarView: View {
                 .textFieldStyle(.roundedBorder)
                 .controlSize(.small)
 
-            connectionSection("Favorites", connections: favorites)
+            connectionSection("Favorites", connections: favorites, isHistory: false)
 
-            connectionSection("History", connections: filteredConnections)
+            connectionSection("History", connections: history, isHistory: true)
 
             Spacer(minLength: 0)
 
-            Button("Clear History") {}
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                state.clearHistory()
+            } label: {
+                Text("Clear History")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
         }
         .padding(10)
         .frame(maxHeight: .infinity, alignment: .top)
@@ -63,7 +79,11 @@ struct ConnectionSidebarView: View {
         }
     }
 
-    private func connectionSection(_ title: String, connections: [ConnectionRecord]) -> some View {
+    private func connectionSection(
+        _ title: String,
+        connections: [ConnectionRecord],
+        isHistory: Bool
+    ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.caption)
@@ -79,7 +99,27 @@ struct ConnectionSidebarView: View {
                     .padding(.vertical, 5)
             } else {
                 ForEach(connections) { connection in
-                    ConnectionRow(connection: connection)
+                    Button {
+                        Task {
+                            await state.connect(connection)
+                        }
+                    } label: {
+                        ConnectionRow(connection: connection)
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button(connection.isFavorite ? "Remove from Favorites" : "Add to Favorites") {
+                            state.toggleFavorite(connection.id)
+                        }
+
+                        Button("Delete", role: .destructive) {
+                            if isHistory {
+                                state.deleteHistoryConnection(connection.id)
+                            } else {
+                                state.deleteConnection(connection.id)
+                            }
+                        }
+                    }
                 }
             }
         }

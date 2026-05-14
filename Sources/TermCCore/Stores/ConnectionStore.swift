@@ -36,6 +36,14 @@ public actor ConnectionStore {
         try writeState(state)
     }
 
+    public func replaceConnections(_ connections: [ConnectionRecord]) throws {
+        var state = try readState()
+        let ids = Set(connections.map(\.id))
+        state.connections = connections
+        state.history.removeAll { !ids.contains($0.connectionID) }
+        try writeState(state)
+    }
+
     public func delete(id: UUID) throws {
         var state = try readState()
         state.connections.removeAll { $0.id == id }
