@@ -18,4 +18,38 @@ final class SFTPServiceTests: XCTestCase {
         let afterDelete = try await service.list(path: "/var/www", session: session)
         XCTAssertFalse(afterDelete.contains { $0.name == "app.tar.gz" })
     }
+
+    func testListOnlyReturnsDirectChildren() async throws {
+        let service = FakeSFTPService()
+        let session = FakeSSHSession(record: .samplePassword)
+
+        try await service.upload(localPath: "/tmp/app.log", remotePath: "/var/www/logs/app.log", session: session)
+
+        let files = try await service.list(path: "/var/www", session: session)
+        XCTAssertEqual(files.map(\.name), ["logs"])
+    }
+
+    func testListMissingDirectoryThrowsNotFound() async throws {
+        let service = FakeSFTPService()
+        let session = FakeSSHSession(record: .samplePassword)
+
+        do {
+            _ = try await service.list(path: "/var/www/missing", session: session)
+            XCTFail("Expected missing directory to throw notFound")
+        } catch let error as SFTPServiceError {
+            XCTAssertEqual(error, .notFound("/var/www/missing"))
+        }
+    }
+
+    func testDeleteMissingFileThrowsNotFound() async throws {
+        let service = FakeSFTPService()
+        let session = FakeSSHSession(record: .samplePassword)
+
+        do {
+            try await service.delete(remotePath: "/var/www/missing.txt", session: session)
+            XCTFail("Expected missing file to throw notFound")
+        } catch let error as SFTPServiceError {
+            XCTAssertEqual(error, .notFound("/var/www/missing.txt"))
+        }
+    }
 }

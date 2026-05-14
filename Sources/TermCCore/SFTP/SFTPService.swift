@@ -10,14 +10,17 @@ public protocol SFTPServicing: Sendable {
 
 public actor FakeSFTPService: SFTPServicing {
     private var files: [String: RemoteFile] = [
+        "/var/www": RemoteFile(name: "www", path: "/var/www", kind: .directory, size: 0),
         "/var/www/logs": RemoteFile(name: "logs", path: "/var/www/logs", kind: .directory, size: 0)
     ]
 
     public init() {}
 
     public func list(path: String, session: SSHSessionProviding) async throws -> [RemoteFile] {
-        files.values
-            .filter { $0.path.hasPrefix(path + "/") }
+        guard files[path]?.kind == .directory else { throw SFTPServiceError.notFound(path) }
+
+        return files.values
+            .filter { parentPath(for: $0.path) == path }
             .sorted { $0.name < $1.name }
     }
 
@@ -34,7 +37,13 @@ public actor FakeSFTPService: SFTPServicing {
     }
 
     public func delete(remotePath: String, session: SSHSessionProviding) async throws {
+        guard files[remotePath] != nil else { throw SFTPServiceError.notFound(remotePath) }
         files[remotePath] = nil
+    }
+
+    private func parentPath(for path: String) -> String {
+        let parent = URL(fileURLWithPath: path).deletingLastPathComponent().path
+        return parent == "/" ? "" : parent
     }
 }
 
