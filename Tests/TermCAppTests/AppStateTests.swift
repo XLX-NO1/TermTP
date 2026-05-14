@@ -1,3 +1,4 @@
+import AppKit
 import Testing
 import TermCCore
 @testable import TermCApp
@@ -8,6 +9,16 @@ import TermCCore
 
     #expect(image.size == .init(width: 18, height: 18))
     #expect(image.isTemplate)
+}
+
+@MainActor
+@Test func menuBarTemplateImageNormalizerShrinksLargeResourceImages() {
+    let image = NSImage(size: .init(width: 64, height: 64))
+
+    let normalized = MenuBarController.normalizedMenuBarTemplateImage(image)
+
+    #expect(normalized.size == .init(width: 18, height: 18))
+    #expect(normalized.isTemplate)
 }
 
 @Test func saveDraftConnectionRejectsPortZero() {

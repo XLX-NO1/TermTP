@@ -2,6 +2,8 @@ import AppKit
 
 @MainActor
 final class MenuBarController {
+    static let menuBarIconSize = NSSize(width: 18, height: 18)
+
     private var statusItem: NSStatusItem?
 
     func install(state: AppState) {
@@ -9,8 +11,9 @@ final class MenuBarController {
             return
         }
 
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = Self.makeMenuBarTemplateImage()
+        item.button?.imagePosition = .imageOnly
         item.button?.toolTip = "TermC"
 
         let menu = NSMenu()
@@ -68,16 +71,13 @@ final class MenuBarController {
 
     static func makeMenuBarTemplateImage() -> NSImage {
         if let image = NSImage(named: "TermCMenuBarTemplate") {
-            image.isTemplate = true
-            return image
+            return normalizedMenuBarTemplateImage(image)
         }
 
-        let size = NSSize(width: 18, height: 18)
-        let image = NSImage(size: size)
+        let image = NSImage(size: menuBarIconSize)
         image.lockFocus()
         defer {
             image.unlockFocus()
-            image.isTemplate = true
         }
 
         NSColor.black.setStroke()
@@ -105,6 +105,12 @@ final class MenuBarController {
         }
 
         path.stroke()
+        return normalizedMenuBarTemplateImage(image)
+    }
+
+    static func normalizedMenuBarTemplateImage(_ image: NSImage) -> NSImage {
+        image.size = menuBarIconSize
+        image.isTemplate = true
         return image
     }
 }
