@@ -1,16 +1,16 @@
 # TermC Handoff
 
-Date: 2026-05-13
+Date: 2026-05-14
 
 ## Current State
 
-Development is paused after completing Task 11 from:
+Development is paused after completing the planned implementation through Task 14 verification from:
 
 ```text
 docs/superpowers/plans/2026-05-13-termc-implementation.md
 ```
 
-Work is happening in an isolated git worktree:
+Work is in the isolated git worktree:
 
 ```text
 /Users/suweichao/ssh终端工具/.worktrees/termc-implementation
@@ -25,49 +25,41 @@ termc-implementation
 Latest commit:
 
 ```text
-27397a7 feat: add Citadel ssh adapter
+ec5bc30 chore: refresh resolved SwiftTerm pin
 ```
 
-The worktree is clean at handoff time.
+The worktree was clean after final verification.
 
 ## Product Decisions
 
-App name:
+App name: `TermC`.
 
-```text
-TermC
-```
+Direction:
 
-Core direction:
-
-- Native macOS app.
-- SwiftUI + AppKit where needed.
+- Native macOS app using SwiftUI plus AppKit where useful.
 - Terminal rendering through SwiftTerm.
 - SSH/SFTP through Citadel.
-- macOS-style dark chrome with black terminal surface and classic green terminal text.
-- Main layout has collapsible left connection sidebar and collapsible right SFTP drawer.
-- Connections support history, favorites, password auth, and private-key auth.
-- File transfer is planned through SFTP after connection.
-- App icon is a black terminal tile with green prompt marks and a white magic hexagram in the upper-right.
-- Menu bar / tray icon should be a white hexagram.
+- macOS dark chrome with black terminal and classic green terminal text.
+- Collapsible left connection sidebar and right SFTP drawer.
+- History, favorites, password auth, private-key auth, file-transfer scaffolding.
+- App icon: black terminal tile with green prompt marks and white magic hexagram in upper-right.
+- Menu bar icon: white hexagram.
 
 ## Why Traversio Changed To Citadel
 
-The original design selected Traversio for SSH/SFTP. During Task 1, SwiftPM could not fetch the documented Traversio package URL:
+The original design selected Traversio. SwiftPM could not fetch:
 
 ```text
 https://github.com/GitSwiftLLC/Traversio.git
 ```
 
-GitHub returned `Repository not found`, and `git ls-remote` confirmed the repository was not visible to the current GitHub account.
-
-The implementation was changed to Citadel:
+GitHub returned `Repository not found`, and `git ls-remote` confirmed the repository was not visible. The implementation therefore switched to:
 
 ```text
 https://github.com/orlandos-nl/Citadel.git
 ```
 
-Citadel is public, SwiftPM-fetchable, based on SwiftNIO SSH, and includes SSH/SFTP APIs. The spec and implementation plan have been updated to Citadel, but some plan snippets still contain stale pseudo APIs. When implementing Citadel tasks, inspect the checked-out Citadel source instead of trusting old sample code.
+Citadel is public, SwiftPM-fetchable, SwiftNIO SSH based, and includes SSH/SFTP APIs. Some old plan snippets used stale pseudo APIs, so future Citadel work should inspect the checked-out source.
 
 Current resolved Citadel version:
 
@@ -75,169 +67,89 @@ Current resolved Citadel version:
 0.12.1
 ```
 
-Important actual Citadel APIs used in Task 11:
+## Completed Work
 
-- `SSHClient.connect(host:port:authenticationMethod:hostKeyValidator:reconnect:)`
-- `SSHAuthenticationMethod.passwordBased(username:password:)`
-- `SSHAuthenticationMethod.rsa(username:privateKey:)`
-- `SSHAuthenticationMethod.ed25519(username:privateKey:)`
-- `SSHHostKeyValidator.acceptAnything()`
-- `SSHClient.close() async throws`
-
-## Completed Tasks
-
-Task 1: Swift Package Foundation
+Important commits since this worktree began:
 
 ```text
 a05a5b5 chore: scaffold TermC Swift package
-```
-
-Task 2: Core Models
-
-```text
 469a3f2 feat: add TermC core models
-```
-
-Task 3: Connection Store
-
-```text
 2891873 feat: persist connections and history
-```
-
-Task 4: Credentials and Import/Export
-
-```text
 7a9dbab feat: add credentials and config import export
-```
-
-Task 5: Transfer Queue
-
-```text
 9f6f4ed feat: add transfer queue
-```
-
-Task 6: SSH Session Protocols and Fake Client
-
-```text
 183591b feat: add ssh session abstractions
-```
-
-Task 7: App State and Main SwiftUI Shell
-
-```text
 7fb5ede feat: add TermC app shell
-```
-
-Task 8: Connection Form
-
-```text
 8fd4367 feat: add connection form
 cceafff fix: validate connection form inputs
-```
-
-Task 9: Icon Assets and Menu Bar Controller
-
-```text
 3cacfd2 feat: add hexagram icons and menu bar controller
 bd8459f fix: refine TermC icon generation
 da5c4a3 fix: package app resources
-```
-
-Task 10: SwiftTerm Terminal Bridge
-
-```text
 31186cf feat: embed SwiftTerm terminal view
 75c0be6 fix: reset terminal before replay
-```
-
-Task 11: Citadel SSH Adapter
-
-```text
 27397a7 feat: add Citadel ssh adapter
+a4c2027 docs: update TermC handoff after Citadel adapter
+85c7b13 fix: tighten Citadel adapter credential handling
+534c361 feat: add sftp service abstractions
+a16cf53 fix: tighten fake sftp directory semantics
+fe3ce43 feat: wire sftp drawer state
+c93be14 fix: replay terminal transcript after resize
+7a6d5b0 fix: require explicit ssh host key policy
+ec5bc30 chore: refresh resolved SwiftTerm pin
 ```
 
-Created:
+## Current Implementation Notes
 
-- `Sources/TermCCore/SSH/CitadelSSHClient.swift`
-- `Tests/TermCCoreTests/SSHConfigurationTests.swift`
+- `CitadelSSHClient` now defaults to `SSHHostKeyPolicy.strict` and throws `hostKeyVerificationRequired` rather than silently accepting any host key.
+- Insecure host-key acceptance is explicit opt-in via `.insecureAcceptAnyHostKey`.
+- SwiftTerm is pinned to revision `73576f6f838414bab4c230cd1b56237bd16c3bbf` in `Package.swift` and `Package.resolved` no longer keeps the old branch pin.
+- `CitadelSSHSession.send` and `drainOutput` remain skeletal buffer behavior. Real PTY streaming is future work.
+- Citadel private-key auth currently handles RSA and Ed25519 OpenSSH keys. ECDSA parsing is still future work.
+- SFTP service is still fake/in-memory but now behaves like a directory listing: direct children only, missing paths throw `.notFound`.
+- `SFTPDrawerView` is wired to `AppState.remotePath` and `remoteFiles`.
+- `TerminalView` replays the transcript after SwiftTerm column changes, fixing the vertical wrapped welcome text seen during manual verification.
 
-Includes:
+## Verification Performed
 
-- `SSHConfigurationSummary`
-- `CitadelSSHClient`
-- `SSHClientAdapterError`
-- `CitadelSSHSession`
-- Password authentication mapping.
-- RSA and Ed25519 private-key authentication mapping.
-- Real Citadel connection and disconnect hooks.
-- Skeletal `send` / `drainOutput` buffer only. Real interactive PTY streaming is still future work.
-
-Task 11 spec review passed via subagent:
-
-```text
-Spec compliant
-```
-
-No separate code-quality review was completed before this handoff because the user requested an immediate stop for quota.
-
-## Current Verification
-
-Task 11 implementer reported:
+Commands run successfully:
 
 ```bash
-swift test --filter SSHConfigurationTests
 swift test
+scripts/build-app.sh
+test -d build/TermC.app
+test -f build/TermC.app/Contents/MacOS/TermC
 ```
 
-Result:
+Latest observed test count:
 
 ```text
-SSHConfigurationTests passed.
-Full swift test passed.
+XCTest: 18 tests, 0 failures
+Swift Testing: 4 tests, 0 failures
 ```
 
-Spec reviewer independently reported:
+Manual app launch was performed with `open build/TermC.app`.
+Observed:
 
-```text
-swift test --filter SSHConfigurationTests passed: 2 tests
-swift test passed: 14 total tests across XCTest and Swift Testing surfaces
-```
+- Main TermC window opens.
+- Left connection sidebar appears.
+- Center terminal is black with green text.
+- Welcome text renders horizontally after resize fix.
+- Right SFTP drawer appears with `/var/www` and `logs`.
+- Toolbar buttons collapse left and right panels.
+- App bundle exists with executable.
 
-Recommended first command when resuming:
+## Remaining Risks / Future Work
 
-```bash
-cd "/Users/suweichao/ssh终端工具/.worktrees/termc-implementation"
-git status --short --branch
-swift test
-```
-
-## Known Notes And Risks
-
-- Task 11 uses `SSHHostKeyValidator.acceptAnything()` as a temporary adapter skeleton. This should be replaced by known-hosts or explicit trust handling before real production SSH usage.
-- Task 11 adds `extension SSHClient: @retroactive @unchecked Sendable {}` so the Citadel client can be held by the actor-backed session under Swift 6 concurrency checks. Revisit this during code-quality review.
-- Citadel adapter currently supports RSA and Ed25519 OpenSSH private keys. ECDSA is not wired yet.
-- `CitadelSSHSession.send` and `drainOutput` are not connected to a real remote shell stream yet.
-- Keychain wrapper compiles but only the in-memory credential store has tests so far.
-- `.build/` must not be committed.
+- Implement real host-key verification, such as known-hosts or TOFU fingerprint storage, before enabling real SSH by default.
+- Connect `CitadelSSHSession.send` and output draining to a real interactive PTY stream.
+- Replace placeholder `AppState.refreshRemoteFiles()` with calls into `SFTPServicing` and eventually real Citadel SFTP.
+- Add real upload/download wiring and progress into the transfer queue.
+- Keychain wrapper compiles, but only the in-memory credential store is unit tested.
+- Add ECDSA private-key support if Citadel exposes or gains public OpenSSH ECDSA key parsing.
 
 ## Next Step
 
-Resume with the missing Task 11 code-quality review first, then continue to:
+This branch is ready for the finishing workflow. Suggested options:
 
-```text
-Task 12: SFTP Models and Fake Service
-```
-
-Task 12 files:
-
-- `Sources/TermCCore/SFTP/SFTPModels.swift`
-- `Sources/TermCCore/SFTP/SFTPService.swift`
-- `Tests/TermCCoreTests/SFTPServiceTests.swift`
-
-Follow the same Subagent-Driven flow:
-
-1. Dispatch Task 11 code-quality reviewer for commit `27397a7`.
-2. Fix any review issues if found.
-3. Start Task 12 with TDD.
-4. Run filtered tests and full `swift test`.
-5. Commit each task separately.
+1. Merge `termc-implementation` into `main` locally.
+2. Keep the worktree and branch for more manual testing.
+3. Push and create a PR if a remote workflow is desired.
