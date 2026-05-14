@@ -59,13 +59,13 @@ enum IconGenerator {
 
             drawMagicHexagram(
                 in: CGRect(
-                    x: bounds.width * 0.19,
-                    y: bounds.height * 0.19,
-                    width: bounds.width * 0.62,
-                    height: bounds.height * 0.62
+                    x: bounds.width * 0.16,
+                    y: bounds.height * 0.16,
+                    width: bounds.width * 0.68,
+                    height: bounds.height * 0.68
                 ),
                 color: .white,
-                lineWidth: bounds.width * 0.014,
+                lineWidth: bounds.width * 0.011,
                 drawsTerminalPrompt: true
             )
         }
@@ -164,7 +164,7 @@ enum IconGenerator {
         paragraphStyle.alignment = .center
 
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: rect.width * 0.20, weight: .bold),
+            .font: NSFont.monospacedSystemFont(ofSize: rect.width * 0.23, weight: .bold),
             .foregroundColor: color,
             .paragraphStyle: paragraphStyle
         ]
@@ -172,7 +172,7 @@ enum IconGenerator {
         let textSize = prompt.size(withAttributes: attributes)
         let textRect = CGRect(
             x: rect.midX - textSize.width / 2,
-            y: rect.midY - textSize.height / 2 - rect.height * 0.015,
+            y: rect.midY - textSize.height / 2 - rect.height * 0.018,
             width: textSize.width,
             height: textSize.height
         )
@@ -191,8 +191,8 @@ enum IconGenerator {
 
         let center = CGPoint(x: rect.midX, y: rect.midY)
         let radius = min(rect.width, rect.height) / 2
-        let upward = trianglePoints(center: center, radius: radius * 0.86, rotation: -.pi / 2)
-        let downward = trianglePoints(center: center, radius: radius * 0.86, rotation: .pi / 2)
+        let upward = trianglePoints(center: center, radius: radius * 0.70, rotation: -.pi / 2)
+        let downward = trianglePoints(center: center, radius: radius * 0.70, rotation: .pi / 2)
 
         let outerCircle = CGRect(
             x: center.x - radius,
@@ -201,50 +201,52 @@ enum IconGenerator {
             height: radius * 2
         )
 
+        drawFlowingRibbons(center: center, radius: radius, color: color, lineWidth: lineWidth)
+
         context.saveGState()
         context.setShouldAntialias(true)
         context.setLineJoin(.round)
         context.setLineCap(.round)
         context.setShadow(
             offset: .zero,
-            blur: lineWidth * 5.5,
-            color: color.withAlphaComponent(0.50).cgColor
+            blur: lineWidth * 6.0,
+            color: color.withAlphaComponent(0.44).cgColor
         )
-        context.setStrokeColor(color.withAlphaComponent(0.28).cgColor)
-        context.setLineWidth(lineWidth * 2.6)
+        context.setStrokeColor(color.withAlphaComponent(0.24).cgColor)
+        context.setLineWidth(lineWidth * 2.4)
         context.strokeEllipse(in: outerCircle)
         strokePolygon(upward, in: context)
         strokePolygon(downward, in: context)
-        strokeCircle(center: center, radius: radius * 0.67, in: context)
-        strokeCircle(center: center, radius: radius * 0.50, in: context)
-        strokeCircle(center: center, radius: radius * 0.34, in: context)
-        drawPortalTicks(center: center, radius: radius, color: color.withAlphaComponent(0.46), lineWidth: lineWidth * 1.4, in: context)
-        drawPortalDiamonds(center: center, radius: radius * 0.74, color: color.withAlphaComponent(0.38), size: lineWidth * 3.1, in: context)
-        drawRuneMarks(center: center, radius: radius * 0.58, color: color.withAlphaComponent(0.36), lineWidth: lineWidth * 1.1, in: context)
+        strokeCircle(center: center, radius: radius * 0.78, in: context)
+        strokeCircle(center: center, radius: radius * 0.55, in: context)
+        strokeCircle(center: center, radius: radius * 0.30, in: context)
+        drawPortalTicks(center: center, radius: radius, color: color.withAlphaComponent(0.38), lineWidth: lineWidth * 1.2, count: 48, in: context)
+        drawStarMedallions(center: center, radius: radius * 0.82, color: color.withAlphaComponent(0.34), lineWidth: lineWidth * 1.15, in: context)
         context.restoreGState()
 
         context.saveGState()
         context.setShouldAntialias(true)
         context.setStrokeColor(color.cgColor)
-        context.setLineWidth(lineWidth)
+        context.setLineWidth(lineWidth * 2.4)
         context.setLineJoin(.round)
         context.setLineCap(.round)
         context.strokeEllipse(in: outerCircle)
+
+        context.setLineWidth(lineWidth * 1.35)
         strokePolygon(upward, in: context)
         strokePolygon(downward, in: context)
-        drawArcaneArcs(center: center, radius: radius * 0.78, color: color.withAlphaComponent(0.92), lineWidth: lineWidth * 0.52, in: context)
+        drawTriangleOverlays(center: center, radius: radius, color: color.withAlphaComponent(0.88), lineWidth: lineWidth * 0.58, in: context)
 
-        context.setLineWidth(lineWidth * 0.55)
+        context.setLineWidth(lineWidth * 0.72)
         context.setStrokeColor(color.withAlphaComponent(0.80).cgColor)
-        strokeCircle(center: center, radius: radius * 0.67, in: context)
-        context.setStrokeColor(color.withAlphaComponent(0.55).cgColor)
-        strokeCircle(center: center, radius: radius * 0.50, in: context)
+        strokeCircle(center: center, radius: radius * 0.78, in: context)
+        context.setStrokeColor(color.withAlphaComponent(0.52).cgColor)
+        strokeCircle(center: center, radius: radius * 0.55, in: context)
         context.setStrokeColor(color.withAlphaComponent(0.92).cgColor)
-        strokeCircle(center: center, radius: radius * 0.34, in: context)
-        drawPortalTicks(center: center, radius: radius, color: color.withAlphaComponent(0.85), lineWidth: lineWidth * 0.55, in: context)
-        drawPortalNodes(center: center, radius: radius * 0.67, color: color, lineWidth: lineWidth, in: context)
-        drawPortalDiamonds(center: center, radius: radius * 0.74, color: color, size: lineWidth * 2.2, in: context)
-        drawRuneMarks(center: center, radius: radius * 0.58, color: color.withAlphaComponent(0.82), lineWidth: lineWidth * 0.52, in: context)
+        strokeCircle(center: center, radius: radius * 0.30, in: context)
+        drawPortalTicks(center: center, radius: radius, color: color.withAlphaComponent(0.88), lineWidth: lineWidth * 0.48, count: 48, in: context)
+        drawStarMedallions(center: center, radius: radius * 0.82, color: color, lineWidth: lineWidth * 0.70, in: context)
+        drawSmallStars(center: center, radius: radius * 0.61, color: color.withAlphaComponent(0.85), in: context)
 
         context.restoreGState()
 
@@ -293,15 +295,16 @@ enum IconGenerator {
         radius: CGFloat,
         color: NSColor,
         lineWidth: CGFloat,
+        count: Int = 24,
         in context: CGContext
     ) {
         context.saveGState()
         context.setStrokeColor(color.cgColor)
         context.setLineWidth(lineWidth)
 
-        for index in 0..<24 {
-            let angle = CGFloat(index) * 2 * .pi / 24
-            let isMajorTick = index % 4 == 0
+        for index in 0..<count {
+            let angle = CGFloat(index) * 2 * .pi / CGFloat(count)
+            let isMajorTick = index % 6 == 0
             let outer = point(center: center, radius: radius * 0.98, angle: angle)
             let inner = point(center: center, radius: radius * (isMajorTick ? 0.88 : 0.92), angle: angle)
             context.beginPath()
@@ -313,59 +316,7 @@ enum IconGenerator {
         context.restoreGState()
     }
 
-    private static func drawPortalNodes(
-        center: CGPoint,
-        radius: CGFloat,
-        color: NSColor,
-        lineWidth: CGFloat,
-        in context: CGContext
-    ) {
-        context.saveGState()
-        context.setFillColor(color.cgColor)
-
-        for index in 0..<6 {
-            let angle = -.pi / 2 + CGFloat(index) * 2 * .pi / 6
-            let nodeCenter = point(center: center, radius: radius, angle: angle)
-            let nodeRadius = lineWidth * 1.55
-            context.fillEllipse(
-                in: CGRect(
-                    x: nodeCenter.x - nodeRadius,
-                    y: nodeCenter.y - nodeRadius,
-                    width: nodeRadius * 2,
-                    height: nodeRadius * 2
-                )
-            )
-        }
-
-        context.restoreGState()
-    }
-
-    private static func drawPortalDiamonds(
-        center: CGPoint,
-        radius: CGFloat,
-        color: NSColor,
-        size: CGFloat,
-        in context: CGContext
-    ) {
-        context.saveGState()
-        context.setFillColor(color.cgColor)
-
-        for index in 0..<6 {
-            let angle = CGFloat(index) * 2 * .pi / 6
-            let diamondCenter = point(center: center, radius: radius, angle: angle)
-            context.beginPath()
-            context.move(to: CGPoint(x: diamondCenter.x, y: diamondCenter.y - size))
-            context.addLine(to: CGPoint(x: diamondCenter.x + size, y: diamondCenter.y))
-            context.addLine(to: CGPoint(x: diamondCenter.x, y: diamondCenter.y + size))
-            context.addLine(to: CGPoint(x: diamondCenter.x - size, y: diamondCenter.y))
-            context.closePath()
-            context.fillPath()
-        }
-
-        context.restoreGState()
-    }
-
-    private static func drawRuneMarks(
+    private static func drawStarMedallions(
         center: CGPoint,
         radius: CGFloat,
         color: NSColor,
@@ -374,28 +325,40 @@ enum IconGenerator {
     ) {
         context.saveGState()
         context.setStrokeColor(color.cgColor)
+        context.setFillColor(color.withAlphaComponent(0.92).cgColor)
         context.setLineWidth(lineWidth)
-        context.setLineCap(.round)
 
-        for index in 0..<12 {
-            let angle = CGFloat(index) * 2 * .pi / 12
-            let markCenter = point(center: center, radius: radius, angle: angle)
-            let tangent = angle + .pi / 2
-            let halfLength = radius * (index % 3 == 0 ? 0.038 : 0.025)
-            context.beginPath()
-            context.move(to: point(center: markCenter, radius: halfLength, angle: tangent))
-            context.addLine(to: point(center: markCenter, radius: halfLength, angle: tangent + .pi))
-            if index % 4 == 1 {
-                context.move(to: markCenter)
-                context.addLine(to: point(center: markCenter, radius: halfLength * 0.85, angle: angle))
+        for index in 0..<4 {
+            let angle = -.pi / 2 + CGFloat(index) * .pi / 2
+            let medallionCenter = point(center: center, radius: radius, angle: angle)
+            let medallionRadius = lineWidth * 3.0
+            strokeCircle(center: medallionCenter, radius: medallionRadius, in: context)
+            drawStar(center: medallionCenter, radius: medallionRadius * 0.58, color: color, in: context)
+        }
+
+        context.restoreGState()
+    }
+
+    private static func drawStar(center: CGPoint, radius: CGFloat, color: NSColor, in context: CGContext) {
+        context.saveGState()
+        context.setFillColor(color.cgColor)
+        context.beginPath()
+        for index in 0..<10 {
+            let angle = -.pi / 2 + CGFloat(index) * .pi / 5
+            let pointRadius = index.isMultiple(of: 2) ? radius : radius * 0.42
+            let starPoint = point(center: center, radius: pointRadius, angle: angle)
+            if index == 0 {
+                context.move(to: starPoint)
+            } else {
+                context.addLine(to: starPoint)
             }
-            context.strokePath()
         }
-
+        context.closePath()
+        context.fillPath()
         context.restoreGState()
     }
 
-    private static func drawArcaneArcs(
+    private static func drawTriangleOverlays(
         center: CGPoint,
         radius: CGFloat,
         color: NSColor,
@@ -405,18 +368,61 @@ enum IconGenerator {
         context.saveGState()
         context.setStrokeColor(color.cgColor)
         context.setLineWidth(lineWidth)
-        context.setLineCap(.round)
+        context.setLineJoin(.round)
 
-        for index in 0..<6 {
-            let start = CGFloat(index) * 2 * .pi / 6 + .pi / 18
-            let end = start + .pi / 7
+        let left = point(center: center, radius: radius * 0.60, angle: .pi)
+        let right = point(center: center, radius: radius * 0.60, angle: 0)
+        let top = point(center: center, radius: radius * 0.64, angle: -.pi / 2)
+        let bottom = point(center: center, radius: radius * 0.64, angle: .pi / 2)
+
+        context.beginPath()
+        context.move(to: left)
+        context.addLine(to: top)
+        context.addLine(to: right)
+        context.move(to: left)
+        context.addLine(to: bottom)
+        context.addLine(to: right)
+        context.strokePath()
+
+        context.restoreGState()
+    }
+
+    private static func drawSmallStars(center: CGPoint, radius: CGFloat, color: NSColor, in context: CGContext) {
+        context.saveGState()
+        context.setFillColor(color.cgColor)
+
+        for index in 0..<8 {
+            let angle = CGFloat(index) * 2 * .pi / 8 + .pi / 8
+            let starCenter = point(center: center, radius: radius, angle: angle)
+            drawStar(center: starCenter, radius: radius * 0.028, color: color, in: context)
+        }
+
+        context.restoreGState()
+    }
+
+    private static func drawFlowingRibbons(center: CGPoint, radius: CGFloat, color: NSColor, lineWidth: CGFloat) {
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            return
+        }
+
+        context.saveGState()
+        context.setStrokeColor(color.withAlphaComponent(0.12).cgColor)
+        context.setLineWidth(lineWidth * 0.58)
+        context.setLineCap(.round)
+        context.setShadow(
+            offset: .zero,
+            blur: lineWidth * 2.6,
+            color: color.withAlphaComponent(0.14).cgColor
+        )
+
+        for index in 0..<2 {
+            let verticalOffset = CGFloat(index == 0 ? -1 : 1) * radius * 0.16
             context.beginPath()
-            context.addArc(
-                center: center,
-                radius: radius,
-                startAngle: start,
-                endAngle: end,
-                clockwise: false
+            context.move(to: CGPoint(x: center.x - radius * 1.05, y: center.y + verticalOffset))
+            context.addCurve(
+                to: CGPoint(x: center.x + radius * 1.05, y: center.y - verticalOffset * 0.7),
+                control1: CGPoint(x: center.x - radius * 0.35, y: center.y - radius * 0.45 + verticalOffset),
+                control2: CGPoint(x: center.x + radius * 0.35, y: center.y + radius * 0.45 - verticalOffset)
             )
             context.strokePath()
         }
