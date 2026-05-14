@@ -58,10 +58,10 @@ enum IconGenerator {
             drawTerminalPrompt(in: bounds)
             drawHexagram(
                 in: CGRect(
-                    x: bounds.width * 0.60,
-                    y: bounds.height * 0.55,
-                    width: bounds.width * 0.21,
-                    height: bounds.height * 0.21
+                    x: bounds.width * 0.42,
+                    y: bounds.height * 0.43,
+                    width: bounds.width * 0.36,
+                    height: bounds.height * 0.36
                 ),
                 color: .white,
                 lineWidth: bounds.width * 0.017
@@ -121,13 +121,13 @@ enum IconGenerator {
 
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: bounds.width * 0.31, weight: .bold),
-            .foregroundColor: NSColor(calibratedRed: 0.25, green: 0.94, blue: 0.48, alpha: 1),
+            .foregroundColor: NSColor.white,
             .paragraphStyle: paragraphStyle
         ]
 
         let textSize = prompt.size(withAttributes: attributes)
         let textRect = CGRect(
-            x: bounds.midX - textSize.width / 2,
+            x: bounds.midX - textSize.width / 2 - bounds.width * 0.10,
             y: bounds.midY - textSize.height / 2 - bounds.height * 0.06,
             width: textSize.width,
             height: textSize.height
@@ -152,8 +152,26 @@ enum IconGenerator {
         context.setLineJoin(.round)
         context.setLineCap(.round)
 
+        let outerCircle = CGRect(
+            x: center.x - radius,
+            y: center.y - radius,
+            width: radius * 2,
+            height: radius * 2
+        )
+        context.strokeEllipse(in: outerCircle)
         strokePolygon(upward, in: context)
         strokePolygon(downward, in: context)
+
+        let centerDotRadius = radius * 0.13
+        context.setFillColor(color.cgColor)
+        context.fillEllipse(
+            in: CGRect(
+                x: center.x - centerDotRadius,
+                y: center.y - centerDotRadius,
+                width: centerDotRadius * 2,
+                height: centerDotRadius * 2
+            )
+        )
 
         context.restoreGState()
     }
