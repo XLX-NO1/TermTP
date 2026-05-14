@@ -24,7 +24,7 @@ public actor FakeSSHSession: SSHSessionProviding {
     public let id = UUID()
     public let record: ConnectionRecord
     private var currentState: SSHSessionState = .connected
-    private var output = "Welcome to TermC\n"
+    private var output = "Welcome to TermTP\n"
 
     public init(record: ConnectionRecord) {
         self.record = record

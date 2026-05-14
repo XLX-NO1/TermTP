@@ -115,7 +115,7 @@ extension TerminalTab {
         title: "Welcome",
         state: .disconnected,
         transcript: """
-        Welcome to TermC
+        Welcome to TermTP
 
         Select a connection from the sidebar to start an SSH session.
         """

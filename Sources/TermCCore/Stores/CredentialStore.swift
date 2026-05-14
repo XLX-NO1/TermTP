@@ -31,7 +31,7 @@ public actor InMemoryCredentialStore: CredentialStoring {
 }
 
 public struct KeychainCredentialStore: CredentialStoring {
-    private let service = "local.termc.credentials"
+    private let service = "local.termtp.credentials"
 
     public init() {}
 

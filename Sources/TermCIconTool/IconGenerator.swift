@@ -12,8 +12,8 @@ enum IconGenerator {
         let appIcon = drawAppIcon(pixelSize: 1024)
         let menuBarIcon = drawMenuBarTemplate(pixelSize: 64)
 
-        try writePNG(appIcon, to: outputDirectory.appendingPathComponent("TermCIcon-1024.png"))
-        try writePNG(menuBarIcon, to: outputDirectory.appendingPathComponent("TermCMenuBarTemplate.png"))
+        try writePNG(appIcon, to: outputDirectory.appendingPathComponent("TermTPIcon-1024.png"))
+        try writePNG(menuBarIcon, to: outputDirectory.appendingPathComponent("TermTPMenuBarTemplate.png"))
     }
 
     private static func drawAppIcon(pixelSize: Int) -> NSBitmapImageRep {
@@ -58,13 +58,13 @@ enum IconGenerator {
             drawTerminalPrompt(in: bounds)
             drawHexagram(
                 in: CGRect(
-                    x: bounds.width * 0.79,
-                    y: bounds.height * 0.76,
-                    width: bounds.width * 0.10,
-                    height: bounds.height * 0.10
+                    x: bounds.width * 0.60,
+                    y: bounds.height * 0.55,
+                    width: bounds.width * 0.21,
+                    height: bounds.height * 0.21
                 ),
                 color: .white,
-                lineWidth: bounds.width * 0.010
+                lineWidth: bounds.width * 0.017
             )
         }
     }
@@ -128,7 +128,7 @@ enum IconGenerator {
         let textSize = prompt.size(withAttributes: attributes)
         let textRect = CGRect(
             x: bounds.midX - textSize.width / 2,
-            y: bounds.midY - textSize.height / 2 - bounds.height * 0.03,
+            y: bounds.midY - textSize.height / 2 - bounds.height * 0.06,
             width: textSize.width,
             height: textSize.height
         )

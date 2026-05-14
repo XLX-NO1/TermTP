@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/build"
-APP_DIR="$BUILD_DIR/TermC.app"
+APP_DIR="$BUILD_DIR/TermTP.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
@@ -17,10 +17,10 @@ TERMC_EXECUTABLE="$SWIFT_BUILD_BIN_DIR/TermCApp"
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
-cp "$TERMC_EXECUTABLE" "$MACOS_DIR/TermC"
-cp "$BUILD_DIR/icons/TermCIcon-1024.png" "$RESOURCES_DIR/TermCIcon-1024.png"
-cp "$BUILD_DIR/icons/TermCIcon.icns" "$RESOURCES_DIR/TermCIcon.icns"
-cp "$BUILD_DIR/icons/TermCMenuBarTemplate.png" "$RESOURCES_DIR/TermCMenuBarTemplate.png"
+cp "$TERMC_EXECUTABLE" "$MACOS_DIR/TermTP"
+cp "$BUILD_DIR/icons/TermTPIcon-1024.png" "$RESOURCES_DIR/TermTPIcon-1024.png"
+cp "$BUILD_DIR/icons/TermTPIcon.icns" "$RESOURCES_DIR/TermTPIcon.icns"
+cp "$BUILD_DIR/icons/TermTPMenuBarTemplate.png" "$RESOURCES_DIR/TermTPMenuBarTemplate.png"
 
 for bundle in "$SWIFT_BUILD_BIN_DIR"/*.bundle; do
     [ -d "$bundle" ] || continue
@@ -33,13 +33,13 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>TermC</string>
+    <string>TermTP</string>
     <key>CFBundleIdentifier</key>
-    <string>local.termc.app</string>
+    <string>local.termtp.app</string>
     <key>CFBundleName</key>
-    <string>TermC</string>
+    <string>TermTP</string>
     <key>CFBundleDisplayName</key>
-    <string>TermC</string>
+    <string>TermTP</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -47,7 +47,7 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>CFBundleIconFile</key>
-    <string>TermCIcon</string>
+    <string>TermTPIcon</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSHighResolutionCapable</key>

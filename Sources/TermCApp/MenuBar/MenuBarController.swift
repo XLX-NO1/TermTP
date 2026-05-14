@@ -14,12 +14,12 @@ final class MenuBarController {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = Self.makeMenuBarTemplateImage()
         item.button?.imagePosition = .imageOnly
-        item.button?.toolTip = "TermC"
+        item.button?.toolTip = "TermTP"
 
         let menu = NSMenu()
         menu.addItem(
             NSMenuItem(
-                title: "Show TermC",
+                title: "Show TermTP",
                 action: #selector(showTermC),
                 keyEquivalent: ""
             )
@@ -34,8 +34,8 @@ final class MenuBarController {
         menu.addItem(.separator())
         menu.addItem(
             NSMenuItem(
-                title: "Quit TermC",
-                action: #selector(quitTermC),
+                title: "Quit TermTP",
+                action: #selector(quitTermTP),
                 keyEquivalent: "q"
             )
         )
@@ -65,12 +65,12 @@ final class MenuBarController {
         state.beginNewConnection()
     }
 
-    @objc private func quitTermC() {
+    @objc private func quitTermTP() {
         NSApp.terminate(nil)
     }
 
     static func makeMenuBarTemplateImage() -> NSImage {
-        if let image = NSImage(named: "TermCMenuBarTemplate") {
+        if let image = NSImage(named: "TermTPMenuBarTemplate") {
             return normalizedMenuBarTemplateImage(image)
         }
 

@@ -11,6 +11,7 @@ final class SSHSessionModelTests: XCTestCase {
 
         try await session.send("echo hi\n")
         let output = await session.drainOutput()
+        XCTAssertTrue(output.contains("Welcome to TermTP"))
         XCTAssertTrue(output.contains("echo hi"))
 
         try await session.disconnect()

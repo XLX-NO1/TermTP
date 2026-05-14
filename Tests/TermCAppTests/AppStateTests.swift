@@ -56,3 +56,7 @@ import TermCCore
         RemoteFile(name: "logs", path: "/srv/app/logs", kind: .directory, size: 0)
     ])
 }
+
+@Test func welcomeTabUsesTermTPBrandName() {
+    #expect(TerminalTab.welcome.transcript.contains("Welcome to TermTP"))
+}

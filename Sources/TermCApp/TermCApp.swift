@@ -6,7 +6,7 @@ struct TermCApp: App {
     @State private var menuBarController = MenuBarController()
 
     var body: some Scene {
-        WindowGroup("TermC") {
+        WindowGroup("TermTP") {
             RootView(state: state)
                 .frame(minWidth: 1040, minHeight: 680)
                 .task {
