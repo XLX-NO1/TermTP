@@ -60,3 +60,12 @@ import TermCCore
 @Test func welcomeTabUsesTermTPBrandName() {
     #expect(TerminalTab.welcome.transcript.contains("Welcome to TermTP"))
 }
+
+@Test func layoutUsesCompactRightSidebarAndBottomTransferArea() {
+    #expect(AppLayout.minimumWindowWidth == 720)
+    #expect(AppLayout.minimumWindowHeight == 460)
+    #expect(AppLayout.defaultWindowWidth == 760)
+    #expect(AppLayout.defaultWindowHeight == 480)
+    #expect(AppLayout.connectionSidebarWidth == 190)
+    #expect(AppLayout.transferDrawerHeight == 150)
+}

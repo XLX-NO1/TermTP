@@ -22,9 +22,10 @@ struct ConnectionSidebarView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 9) {
             Text("Connections")
-                .font(.headline)
+                .font(.subheadline)
+                .fontWeight(.semibold)
                 .foregroundStyle(.white)
 
             Button {
@@ -33,10 +34,12 @@ struct ConnectionSidebarView: View {
                 Label("New Connection", systemImage: "plus")
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.small)
             .frame(maxWidth: .infinity, alignment: .leading)
 
             TextField("Search", text: $searchText)
                 .textFieldStyle(.roundedBorder)
+                .controlSize(.small)
 
             connectionSection("Favorites", connections: favorites)
 
@@ -46,12 +49,14 @@ struct ConnectionSidebarView: View {
 
             Button("Clear History") {}
                 .buttonStyle(.bordered)
+                .controlSize(.small)
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
+        .padding(10)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(Color(red: 0.13, green: 0.14, blue: 0.16))
-        .overlay(alignment: .trailing) {
+        .background(Color(red: 0.10, green: 0.11, blue: 0.12))
+        .overlay(alignment: .leading) {
             Rectangle()
                 .fill(Color.white.opacity(0.08))
                 .frame(width: 1)
@@ -59,19 +64,19 @@ struct ConnectionSidebarView: View {
     }
 
     private func connectionSection(_ title: String, connections: [ConnectionRecord]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.caption)
                 .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white)
                 .textCase(.uppercase)
 
             if connections.isEmpty {
                 Text("No connections")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.66))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 5)
             } else {
                 ForEach(connections) { connection in
                     ConnectionRow(connection: connection)
@@ -87,24 +92,24 @@ private struct ConnectionRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(connection.alias)
-                .font(.callout)
+                .font(.caption)
                 .fontWeight(.medium)
                 .foregroundStyle(.white)
                 .lineLimit(1)
 
             Text("\(connection.username)@\(connection.host):\(connection.port)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.68))
                 .lineLimit(1)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+        .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
     }
 }
 
 #Preview {
     ConnectionSidebarView(state: AppState())
-        .frame(width: 260, height: 640)
+        .frame(width: AppLayout.connectionSidebarWidth, height: 460)
 }

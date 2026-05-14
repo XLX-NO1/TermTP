@@ -19,26 +19,26 @@ struct TerminalWorkspaceView: View {
     }
 
     private var tabStrip: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             ForEach(tabs) { tab in
                 Button {
                     selectedTabID = tab.id
                 } label: {
-                    HStack(spacing: 7) {
+                    HStack(spacing: 5) {
                         Circle()
                             .fill(color(for: tab.state))
-                            .frame(width: 8, height: 8)
+                            .frame(width: 6, height: 6)
 
                         Text(tab.title)
-                            .font(.callout)
+                            .font(.caption)
                             .lineLimit(1)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
                     .foregroundStyle(tab.id == selectedTabID ? .white : .secondary)
                     .background(
                         tab.id == selectedTabID ? Color.white.opacity(0.14) : Color.clear,
-                        in: RoundedRectangle(cornerRadius: 8)
+                        in: RoundedRectangle(cornerRadius: 6)
                     )
                 }
                 .buttonStyle(.plain)
@@ -46,8 +46,8 @@ struct TerminalWorkspaceView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
         .background(Color(red: 0.10, green: 0.11, blue: 0.12))
         .overlay(alignment: .bottom) {
             Rectangle()

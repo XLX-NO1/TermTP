@@ -8,11 +8,23 @@ struct TermCApp: App {
     var body: some Scene {
         WindowGroup("TermTP") {
             RootView(state: state)
-                .frame(minWidth: 1040, minHeight: 680)
+                .frame(
+                    width: AppLayout.defaultWindowWidth,
+                    height: AppLayout.defaultWindowHeight
+                )
+                .frame(
+                    minWidth: AppLayout.minimumWindowWidth,
+                    minHeight: AppLayout.minimumWindowHeight
+                )
                 .task {
                     menuBarController.install(state: state)
                 }
         }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(
+            width: AppLayout.defaultWindowWidth,
+            height: AppLayout.defaultWindowHeight
+        )
         .commands {
             CommandMenu("View") {
                 Button("Toggle Connections") {
