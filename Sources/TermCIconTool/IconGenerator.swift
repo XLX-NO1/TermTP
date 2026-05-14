@@ -35,10 +35,11 @@ enum IconGenerator {
             let background = CGGradient(
                 colorsSpace: CGColorSpaceCreateDeviceRGB(),
                 colors: [
-                    NSColor(calibratedRed: 0.03, green: 0.04, blue: 0.05, alpha: 1).cgColor,
-                    NSColor(calibratedRed: 0.10, green: 0.12, blue: 0.13, alpha: 1).cgColor
+                    NSColor(calibratedRed: 0.02, green: 0.03, blue: 0.08, alpha: 1).cgColor,
+                    NSColor(calibratedRed: 0.07, green: 0.04, blue: 0.16, alpha: 1).cgColor,
+                    NSColor(calibratedRed: 0.02, green: 0.10, blue: 0.14, alpha: 1).cgColor
                 ] as CFArray,
-                locations: [0, 1]
+                locations: [0, 0.56, 1]
             )
             if let background {
                 context.drawLinearGradient(
@@ -48,6 +49,9 @@ enum IconGenerator {
                     options: []
                 )
             }
+
+            drawAnimeAura(in: bounds)
+            drawSparkles(in: bounds)
 
             context.setStrokeColor(NSColor(calibratedWhite: 1, alpha: 0.08).cgColor)
             context.setLineWidth(8)
@@ -63,6 +67,8 @@ enum IconGenerator {
                     height: bounds.height * 0.62
                 ),
                 color: .white,
+                accentColor: NSColor(calibratedRed: 0.24, green: 0.95, blue: 1.00, alpha: 1),
+                secondaryColor: NSColor(calibratedRed: 1.00, green: 0.34, blue: 0.83, alpha: 1),
                 lineWidth: bounds.width * 0.014,
                 drawsTerminalPrompt: true
             )
@@ -74,6 +80,8 @@ enum IconGenerator {
             drawMagicHexagram(
                 in: CGRect(x: bounds.width * 0.12, y: bounds.height * 0.12, width: bounds.width * 0.76, height: bounds.height * 0.76),
                 color: .white,
+                accentColor: .white,
+                secondaryColor: .white,
                 lineWidth: bounds.width * 0.075,
                 drawsTerminalPrompt: false
             )
@@ -115,14 +123,82 @@ enum IconGenerator {
         return bitmap
     }
 
-    private static func drawTerminalPrompt(in rect: CGRect) {
+    private static func drawAnimeAura(in bounds: CGRect) {
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            return
+        }
+
+        let aura = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: [
+                NSColor(calibratedRed: 0.18, green: 0.90, blue: 1.00, alpha: 0.30).cgColor,
+                NSColor(calibratedRed: 1.00, green: 0.24, blue: 0.80, alpha: 0.16).cgColor,
+                NSColor(calibratedRed: 0.05, green: 0.04, blue: 0.12, alpha: 0.00).cgColor
+            ] as CFArray,
+            locations: [0, 0.45, 1]
+        )
+
+        if let aura {
+            context.drawRadialGradient(
+                aura,
+                startCenter: CGPoint(x: bounds.midX, y: bounds.midY),
+                startRadius: bounds.width * 0.08,
+                endCenter: CGPoint(x: bounds.midX, y: bounds.midY),
+                endRadius: bounds.width * 0.49,
+                options: []
+            )
+        }
+    }
+
+    private static func drawSparkles(in bounds: CGRect) {
+        let sparkles: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
+            (0.26, 0.27, 0.018, 0.80),
+            (0.72, 0.28, 0.012, 0.65),
+            (0.24, 0.73, 0.010, 0.55),
+            (0.77, 0.69, 0.016, 0.75),
+            (0.50, 0.82, 0.009, 0.50)
+        ]
+
+        for sparkle in sparkles {
+            drawSparkle(
+                center: CGPoint(x: bounds.width * sparkle.0, y: bounds.height * sparkle.1),
+                radius: bounds.width * sparkle.2,
+                alpha: sparkle.3
+            )
+        }
+    }
+
+    private static func drawSparkle(center: CGPoint, radius: CGFloat, alpha: CGFloat) {
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            return
+        }
+
+        context.saveGState()
+        context.setStrokeColor(NSColor(calibratedWhite: 1, alpha: alpha).cgColor)
+        context.setLineWidth(radius * 0.22)
+        context.setLineCap(.round)
+        context.setShadow(
+            offset: .zero,
+            blur: radius * 1.6,
+            color: NSColor(calibratedRed: 0.36, green: 0.95, blue: 1, alpha: alpha * 0.7).cgColor
+        )
+        context.beginPath()
+        context.move(to: CGPoint(x: center.x - radius, y: center.y))
+        context.addLine(to: CGPoint(x: center.x + radius, y: center.y))
+        context.move(to: CGPoint(x: center.x, y: center.y - radius))
+        context.addLine(to: CGPoint(x: center.x, y: center.y + radius))
+        context.strokePath()
+        context.restoreGState()
+    }
+
+    private static func drawTerminalPrompt(in rect: CGRect, color: NSColor) {
         let prompt = ">_"
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.alignment = .center
 
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: rect.width * 0.20, weight: .bold),
-            .foregroundColor: NSColor.white,
+            .foregroundColor: color,
             .paragraphStyle: paragraphStyle
         ]
 
@@ -139,6 +215,8 @@ enum IconGenerator {
     private static func drawMagicHexagram(
         in rect: CGRect,
         color: NSColor,
+        accentColor: NSColor,
+        secondaryColor: NSColor,
         lineWidth: CGFloat,
         drawsTerminalPrompt: Bool
     ) {
@@ -151,33 +229,55 @@ enum IconGenerator {
         let upward = trianglePoints(center: center, radius: radius * 0.86, rotation: -.pi / 2)
         let downward = trianglePoints(center: center, radius: radius * 0.86, rotation: .pi / 2)
 
-        context.saveGState()
-        context.setShouldAntialias(true)
-        context.setStrokeColor(color.cgColor)
-        context.setLineWidth(lineWidth)
-        context.setLineJoin(.round)
-        context.setLineCap(.round)
-
         let outerCircle = CGRect(
             x: center.x - radius,
             y: center.y - radius,
             width: radius * 2,
             height: radius * 2
         )
+
+        context.saveGState()
+        context.setShouldAntialias(true)
+        context.setLineJoin(.round)
+        context.setLineCap(.round)
+        context.setShadow(
+            offset: .zero,
+            blur: lineWidth * 5.5,
+            color: accentColor.withAlphaComponent(0.78).cgColor
+        )
+        context.setStrokeColor(accentColor.withAlphaComponent(0.36).cgColor)
+        context.setLineWidth(lineWidth * 2.6)
+        context.strokeEllipse(in: outerCircle)
+        strokePolygon(upward, in: context)
+        strokePolygon(downward, in: context)
+        strokeCircle(center: center, radius: radius * 0.67, in: context)
+        strokeCircle(center: center, radius: radius * 0.34, in: context)
+        drawPortalTicks(center: center, radius: radius, color: accentColor.withAlphaComponent(0.50), lineWidth: lineWidth * 1.4, in: context)
+        drawPortalNodes(center: center, radius: radius * 0.67, color: secondaryColor.withAlphaComponent(0.45), lineWidth: lineWidth * 1.7, in: context)
+        context.restoreGState()
+
+        context.saveGState()
+        context.setShouldAntialias(true)
+        context.setStrokeColor(accentColor.cgColor)
+        context.setLineWidth(lineWidth)
+        context.setLineJoin(.round)
+        context.setLineCap(.round)
         context.strokeEllipse(in: outerCircle)
         strokePolygon(upward, in: context)
         strokePolygon(downward, in: context)
 
         context.setLineWidth(lineWidth * 0.55)
+        context.setStrokeColor(secondaryColor.cgColor)
         strokeCircle(center: center, radius: radius * 0.67, in: context)
+        context.setStrokeColor(color.withAlphaComponent(0.92).cgColor)
         strokeCircle(center: center, radius: radius * 0.34, in: context)
-        drawPortalTicks(center: center, radius: radius, color: color, lineWidth: lineWidth * 0.55, in: context)
-        drawPortalNodes(center: center, radius: radius * 0.67, color: color, lineWidth: lineWidth, in: context)
+        drawPortalTicks(center: center, radius: radius, color: color.withAlphaComponent(0.85), lineWidth: lineWidth * 0.55, in: context)
+        drawPortalNodes(center: center, radius: radius * 0.67, color: secondaryColor, lineWidth: lineWidth, in: context)
 
         context.restoreGState()
 
         if drawsTerminalPrompt {
-            drawTerminalPrompt(in: rect)
+            drawTerminalPrompt(in: rect, color: color)
         }
     }
 
