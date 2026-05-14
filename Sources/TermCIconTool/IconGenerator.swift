@@ -35,11 +35,10 @@ enum IconGenerator {
             let background = CGGradient(
                 colorsSpace: CGColorSpaceCreateDeviceRGB(),
                 colors: [
-                    NSColor(calibratedRed: 0.02, green: 0.03, blue: 0.08, alpha: 1).cgColor,
-                    NSColor(calibratedRed: 0.07, green: 0.04, blue: 0.16, alpha: 1).cgColor,
-                    NSColor(calibratedRed: 0.02, green: 0.10, blue: 0.14, alpha: 1).cgColor
+                    NSColor(calibratedRed: 0.03, green: 0.04, blue: 0.05, alpha: 1).cgColor,
+                    NSColor(calibratedRed: 0.10, green: 0.12, blue: 0.13, alpha: 1).cgColor
                 ] as CFArray,
-                locations: [0, 0.56, 1]
+                locations: [0, 1]
             )
             if let background {
                 context.drawLinearGradient(
@@ -50,7 +49,6 @@ enum IconGenerator {
                 )
             }
 
-            drawAnimeAura(in: bounds)
             drawSparkles(in: bounds)
 
             context.setStrokeColor(NSColor(calibratedWhite: 1, alpha: 0.08).cgColor)
@@ -67,8 +65,6 @@ enum IconGenerator {
                     height: bounds.height * 0.62
                 ),
                 color: .white,
-                accentColor: NSColor(calibratedRed: 0.24, green: 0.95, blue: 1.00, alpha: 1),
-                secondaryColor: NSColor(calibratedRed: 1.00, green: 0.34, blue: 0.83, alpha: 1),
                 lineWidth: bounds.width * 0.014,
                 drawsTerminalPrompt: true
             )
@@ -80,8 +76,6 @@ enum IconGenerator {
             drawMagicHexagram(
                 in: CGRect(x: bounds.width * 0.12, y: bounds.height * 0.12, width: bounds.width * 0.76, height: bounds.height * 0.76),
                 color: .white,
-                accentColor: .white,
-                secondaryColor: .white,
                 lineWidth: bounds.width * 0.075,
                 drawsTerminalPrompt: false
             )
@@ -123,40 +117,13 @@ enum IconGenerator {
         return bitmap
     }
 
-    private static func drawAnimeAura(in bounds: CGRect) {
-        guard let context = NSGraphicsContext.current?.cgContext else {
-            return
-        }
-
-        let aura = CGGradient(
-            colorsSpace: CGColorSpaceCreateDeviceRGB(),
-            colors: [
-                NSColor(calibratedRed: 0.18, green: 0.90, blue: 1.00, alpha: 0.30).cgColor,
-                NSColor(calibratedRed: 1.00, green: 0.24, blue: 0.80, alpha: 0.16).cgColor,
-                NSColor(calibratedRed: 0.05, green: 0.04, blue: 0.12, alpha: 0.00).cgColor
-            ] as CFArray,
-            locations: [0, 0.45, 1]
-        )
-
-        if let aura {
-            context.drawRadialGradient(
-                aura,
-                startCenter: CGPoint(x: bounds.midX, y: bounds.midY),
-                startRadius: bounds.width * 0.08,
-                endCenter: CGPoint(x: bounds.midX, y: bounds.midY),
-                endRadius: bounds.width * 0.49,
-                options: []
-            )
-        }
-    }
-
     private static func drawSparkles(in bounds: CGRect) {
         let sparkles: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
-            (0.26, 0.27, 0.018, 0.80),
-            (0.72, 0.28, 0.012, 0.65),
-            (0.24, 0.73, 0.010, 0.55),
-            (0.77, 0.69, 0.016, 0.75),
-            (0.50, 0.82, 0.009, 0.50)
+            (0.25, 0.26, 0.017, 0.70),
+            (0.74, 0.28, 0.011, 0.55),
+            (0.24, 0.74, 0.010, 0.45),
+            (0.77, 0.70, 0.015, 0.65),
+            (0.50, 0.83, 0.009, 0.42)
         ]
 
         for sparkle in sparkles {
@@ -180,7 +147,7 @@ enum IconGenerator {
         context.setShadow(
             offset: .zero,
             blur: radius * 1.6,
-            color: NSColor(calibratedRed: 0.36, green: 0.95, blue: 1, alpha: alpha * 0.7).cgColor
+            color: NSColor(calibratedWhite: 1, alpha: alpha * 0.5).cgColor
         )
         context.beginPath()
         context.move(to: CGPoint(x: center.x - radius, y: center.y))
@@ -215,8 +182,6 @@ enum IconGenerator {
     private static func drawMagicHexagram(
         in rect: CGRect,
         color: NSColor,
-        accentColor: NSColor,
-        secondaryColor: NSColor,
         lineWidth: CGFloat,
         drawsTerminalPrompt: Bool
     ) {
@@ -243,36 +208,43 @@ enum IconGenerator {
         context.setShadow(
             offset: .zero,
             blur: lineWidth * 5.5,
-            color: accentColor.withAlphaComponent(0.78).cgColor
+            color: color.withAlphaComponent(0.50).cgColor
         )
-        context.setStrokeColor(accentColor.withAlphaComponent(0.36).cgColor)
+        context.setStrokeColor(color.withAlphaComponent(0.28).cgColor)
         context.setLineWidth(lineWidth * 2.6)
         context.strokeEllipse(in: outerCircle)
         strokePolygon(upward, in: context)
         strokePolygon(downward, in: context)
         strokeCircle(center: center, radius: radius * 0.67, in: context)
+        strokeCircle(center: center, radius: radius * 0.50, in: context)
         strokeCircle(center: center, radius: radius * 0.34, in: context)
-        drawPortalTicks(center: center, radius: radius, color: accentColor.withAlphaComponent(0.50), lineWidth: lineWidth * 1.4, in: context)
-        drawPortalNodes(center: center, radius: radius * 0.67, color: secondaryColor.withAlphaComponent(0.45), lineWidth: lineWidth * 1.7, in: context)
+        drawPortalTicks(center: center, radius: radius, color: color.withAlphaComponent(0.46), lineWidth: lineWidth * 1.4, in: context)
+        drawPortalDiamonds(center: center, radius: radius * 0.74, color: color.withAlphaComponent(0.38), size: lineWidth * 3.1, in: context)
+        drawRuneMarks(center: center, radius: radius * 0.58, color: color.withAlphaComponent(0.36), lineWidth: lineWidth * 1.1, in: context)
         context.restoreGState()
 
         context.saveGState()
         context.setShouldAntialias(true)
-        context.setStrokeColor(accentColor.cgColor)
+        context.setStrokeColor(color.cgColor)
         context.setLineWidth(lineWidth)
         context.setLineJoin(.round)
         context.setLineCap(.round)
         context.strokeEllipse(in: outerCircle)
         strokePolygon(upward, in: context)
         strokePolygon(downward, in: context)
+        drawArcaneArcs(center: center, radius: radius * 0.78, color: color.withAlphaComponent(0.92), lineWidth: lineWidth * 0.52, in: context)
 
         context.setLineWidth(lineWidth * 0.55)
-        context.setStrokeColor(secondaryColor.cgColor)
+        context.setStrokeColor(color.withAlphaComponent(0.80).cgColor)
         strokeCircle(center: center, radius: radius * 0.67, in: context)
+        context.setStrokeColor(color.withAlphaComponent(0.55).cgColor)
+        strokeCircle(center: center, radius: radius * 0.50, in: context)
         context.setStrokeColor(color.withAlphaComponent(0.92).cgColor)
         strokeCircle(center: center, radius: radius * 0.34, in: context)
         drawPortalTicks(center: center, radius: radius, color: color.withAlphaComponent(0.85), lineWidth: lineWidth * 0.55, in: context)
-        drawPortalNodes(center: center, radius: radius * 0.67, color: secondaryColor, lineWidth: lineWidth, in: context)
+        drawPortalNodes(center: center, radius: radius * 0.67, color: color, lineWidth: lineWidth, in: context)
+        drawPortalDiamonds(center: center, radius: radius * 0.74, color: color, size: lineWidth * 2.2, in: context)
+        drawRuneMarks(center: center, radius: radius * 0.58, color: color.withAlphaComponent(0.82), lineWidth: lineWidth * 0.52, in: context)
 
         context.restoreGState()
 
@@ -363,6 +335,90 @@ enum IconGenerator {
                     height: nodeRadius * 2
                 )
             )
+        }
+
+        context.restoreGState()
+    }
+
+    private static func drawPortalDiamonds(
+        center: CGPoint,
+        radius: CGFloat,
+        color: NSColor,
+        size: CGFloat,
+        in context: CGContext
+    ) {
+        context.saveGState()
+        context.setFillColor(color.cgColor)
+
+        for index in 0..<6 {
+            let angle = CGFloat(index) * 2 * .pi / 6
+            let diamondCenter = point(center: center, radius: radius, angle: angle)
+            context.beginPath()
+            context.move(to: CGPoint(x: diamondCenter.x, y: diamondCenter.y - size))
+            context.addLine(to: CGPoint(x: diamondCenter.x + size, y: diamondCenter.y))
+            context.addLine(to: CGPoint(x: diamondCenter.x, y: diamondCenter.y + size))
+            context.addLine(to: CGPoint(x: diamondCenter.x - size, y: diamondCenter.y))
+            context.closePath()
+            context.fillPath()
+        }
+
+        context.restoreGState()
+    }
+
+    private static func drawRuneMarks(
+        center: CGPoint,
+        radius: CGFloat,
+        color: NSColor,
+        lineWidth: CGFloat,
+        in context: CGContext
+    ) {
+        context.saveGState()
+        context.setStrokeColor(color.cgColor)
+        context.setLineWidth(lineWidth)
+        context.setLineCap(.round)
+
+        for index in 0..<12 {
+            let angle = CGFloat(index) * 2 * .pi / 12
+            let markCenter = point(center: center, radius: radius, angle: angle)
+            let tangent = angle + .pi / 2
+            let halfLength = radius * (index % 3 == 0 ? 0.038 : 0.025)
+            context.beginPath()
+            context.move(to: point(center: markCenter, radius: halfLength, angle: tangent))
+            context.addLine(to: point(center: markCenter, radius: halfLength, angle: tangent + .pi))
+            if index % 4 == 1 {
+                context.move(to: markCenter)
+                context.addLine(to: point(center: markCenter, radius: halfLength * 0.85, angle: angle))
+            }
+            context.strokePath()
+        }
+
+        context.restoreGState()
+    }
+
+    private static func drawArcaneArcs(
+        center: CGPoint,
+        radius: CGFloat,
+        color: NSColor,
+        lineWidth: CGFloat,
+        in context: CGContext
+    ) {
+        context.saveGState()
+        context.setStrokeColor(color.cgColor)
+        context.setLineWidth(lineWidth)
+        context.setLineCap(.round)
+
+        for index in 0..<6 {
+            let start = CGFloat(index) * 2 * .pi / 6 + .pi / 18
+            let end = start + .pi / 7
+            context.beginPath()
+            context.addArc(
+                center: center,
+                radius: radius,
+                startAngle: start,
+                endAngle: end,
+                clockwise: false
+            )
+            context.strokePath()
         }
 
         context.restoreGState()
