@@ -13,13 +13,13 @@ struct TerminalView: NSViewRepresentable {
         let terminalView = SwiftTerm.TerminalView(frame: .zero)
         terminalView.terminalDelegate = context.coordinator
         configure(terminalView)
-        render(transcript, in: terminalView, coordinator: context.coordinator)
+        context.coordinator.updateTranscript(transcript, in: terminalView, configure: configure)
         return terminalView
     }
 
     func updateNSView(_ terminalView: SwiftTerm.TerminalView, context: Context) {
         configure(terminalView)
-        render(transcript, in: terminalView, coordinator: context.coordinator)
+        context.coordinator.updateTranscript(transcript, in: terminalView, configure: configure)
     }
 
     private func configure(_ terminalView: SwiftTerm.TerminalView) {
@@ -36,25 +36,48 @@ struct TerminalView: NSViewRepresentable {
         terminalView.layer?.backgroundColor = NSColor.black.cgColor
     }
 
-    private func render(_ transcript: String, in terminalView: SwiftTerm.TerminalView, coordinator: Coordinator) {
-        guard coordinator.renderedTranscript != transcript else { return }
+    @MainActor
+    final class Coordinator: NSObject, @MainActor TerminalViewDelegate {
+        private var currentTranscript = ""
+        private var renderedTranscript: String?
+        private var renderedColumns: Int?
+        private var configureTerminalView: (@MainActor (SwiftTerm.TerminalView) -> Void)?
 
-        coordinator.renderedTranscript = transcript
-        terminalView.getTerminal().resetToInitialState()
-        configure(terminalView)
-        terminalView.feed(text: "\u{1b}[2J\u{1b}[3J\u{1b}[H")
-        terminalView.feed(text: transcript.normalizedTerminalLineEndings)
-    }
+        @MainActor
+        func updateTranscript(
+            _ transcript: String,
+            in terminalView: SwiftTerm.TerminalView,
+            configure: @escaping @MainActor (SwiftTerm.TerminalView) -> Void
+        ) {
+            currentTranscript = transcript
+            configureTerminalView = configure
+            render(in: terminalView, force: renderedTranscript != transcript || renderedColumns == nil)
+        }
 
-    final class Coordinator: NSObject, TerminalViewDelegate {
-        var renderedTranscript: String?
+        @MainActor
+        func sizeChanged(source: SwiftTerm.TerminalView, newCols: Int, newRows: Int) {
+            guard renderedColumns != newCols else { return }
+            render(in: source, force: true)
+        }
 
-        func sizeChanged(source: SwiftTerm.TerminalView, newCols: Int, newRows: Int) {}
         func setTerminalTitle(source: SwiftTerm.TerminalView, title: String) {}
         func hostCurrentDirectoryUpdate(source: SwiftTerm.TerminalView, directory: String?) {}
         func send(source: SwiftTerm.TerminalView, data: ArraySlice<UInt8>) {}
         func scrolled(source: SwiftTerm.TerminalView, position: Double) {}
         func rangeChanged(source: SwiftTerm.TerminalView, startY: Int, endY: Int) {}
+
+        @MainActor
+        private func render(in terminalView: SwiftTerm.TerminalView, force: Bool = false) {
+            let columns = terminalView.getTerminal().cols
+            guard force || renderedColumns != columns else { return }
+
+            renderedColumns = columns
+            renderedTranscript = currentTranscript
+            terminalView.getTerminal().resetToInitialState()
+            configureTerminalView?(terminalView)
+            terminalView.feed(text: "\u{1b}[2J\u{1b}[3J\u{1b}[H")
+            terminalView.feed(text: currentTranscript.normalizedTerminalLineEndings)
+        }
     }
 }
 
