@@ -251,7 +251,10 @@ enum IconGenerator {
         context.restoreGState()
 
         if drawsTerminalPrompt {
-            drawTerminalPrompt(in: rect, color: color)
+            drawTerminalPrompt(
+                in: rect,
+                color: NSColor(calibratedRed: 0.25, green: 0.94, blue: 0.48, alpha: 1)
+            )
         }
     }
 
