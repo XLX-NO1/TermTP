@@ -73,11 +73,10 @@ enum IconGenerator {
 
     private static func drawMenuBarTemplate(pixelSize: Int) -> NSBitmapImageRep {
         drawBitmap(pixelWidth: pixelSize, pixelHeight: pixelSize) { _, bounds in
-            drawMagicHexagram(
-                in: CGRect(x: bounds.width * 0.12, y: bounds.height * 0.12, width: bounds.width * 0.76, height: bounds.height * 0.76),
+            drawCompactMagicHexagram(
+                in: CGRect(x: bounds.width * 0.10, y: bounds.height * 0.10, width: bounds.width * 0.80, height: bounds.height * 0.80),
                 color: .white,
-                lineWidth: bounds.width * 0.075,
-                drawsTerminalPrompt: false
+                lineWidth: bounds.width * 0.070
             )
         }
     }
@@ -256,6 +255,34 @@ enum IconGenerator {
                 color: NSColor(calibratedRed: 0.25, green: 0.94, blue: 0.48, alpha: 1)
             )
         }
+    }
+
+    private static func drawCompactMagicHexagram(in rect: CGRect, color: NSColor, lineWidth: CGFloat) {
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            return
+        }
+
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        let upward = trianglePoints(center: center, radius: radius * 0.68, rotation: -.pi / 2)
+        let downward = trianglePoints(center: center, radius: radius * 0.68, rotation: .pi / 2)
+
+        context.saveGState()
+        context.setShouldAntialias(true)
+        context.setStrokeColor(color.cgColor)
+        context.setLineWidth(lineWidth)
+        context.setLineJoin(.round)
+        context.setLineCap(.round)
+
+        strokeCircle(center: center, radius: radius, in: context)
+        strokePolygon(upward, in: context)
+        strokePolygon(downward, in: context)
+        context.setLineWidth(lineWidth * 0.62)
+        strokeCircle(center: center, radius: radius * 0.34, in: context)
+
+        context.restoreGState()
+
+        drawTerminalPrompt(in: rect, color: color)
     }
 
     private static func trianglePoints(center: CGPoint, radius: CGFloat, rotation: CGFloat) -> [CGPoint] {
