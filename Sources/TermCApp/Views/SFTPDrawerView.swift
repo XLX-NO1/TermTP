@@ -2,14 +2,7 @@ import SwiftUI
 import TermCCore
 
 struct SFTPDrawerView: View {
-    let transfers: [TransferRecord]
-
-    private let files = [
-        ("index.html", "12 KB"),
-        ("release.tar.gz", "84 MB"),
-        ("assets", "Folder"),
-        ("logs", "Folder")
-    ]
+    @Bindable var state: AppState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -21,6 +14,7 @@ struct SFTPDrawerView: View {
                 Spacer()
 
                 Button {
+                    state.refreshRemoteFiles()
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
@@ -28,8 +22,8 @@ struct SFTPDrawerView: View {
                 .help("Refresh")
             }
 
-            Text("/var/www")
-                .font(.system(.callout, design: .monospaced))
+            Text(state.remotePath)
+                .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
@@ -37,21 +31,23 @@ struct SFTPDrawerView: View {
                 .background(Color.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 8))
 
             VStack(spacing: 6) {
-                ForEach(files, id: \.0) { file in
+                ForEach(state.remoteFiles) { file in
                     HStack(spacing: 10) {
-                        Image(systemName: file.1 == "Folder" ? "folder" : "doc")
+                        Image(systemName: file.kind == .file ? "doc" : "folder")
                             .foregroundStyle(.secondary)
                             .frame(width: 18)
 
-                        Text(file.0)
+                        Text(file.name)
                             .foregroundStyle(.white)
                             .lineLimit(1)
 
                         Spacer()
 
-                        Text(file.1)
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
+                        if file.kind == .file {
+                            Text(ByteCountFormatter.string(fromByteCount: file.size, countStyle: .file))
+                                .foregroundStyle(.secondary)
+                                .font(.caption2)
+                        }
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
@@ -61,8 +57,8 @@ struct SFTPDrawerView: View {
 
             Spacer(minLength: 0)
 
-            if !transfers.isEmpty {
-                Text("\(transfers.count) transfer\(transfers.count == 1 ? "" : "s")")
+            if !state.transfers.isEmpty {
+                Text("\(state.transfers.count) transfer\(state.transfers.count == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -88,6 +84,6 @@ struct SFTPDrawerView: View {
 }
 
 #Preview {
-    SFTPDrawerView(transfers: [])
+    SFTPDrawerView(state: AppState())
         .frame(width: 300, height: 640)
 }

@@ -17,6 +17,10 @@ final class AppState {
     var draftUsername = ""
     var draftUsesKey = false
     var draftPrivateKeyPath = ""
+    var remotePath = "/var/www"
+    var remoteFiles: [RemoteFile] = [
+        RemoteFile(name: "logs", path: "/var/www/logs", kind: .directory, size: 0)
+    ]
 
     init(
         tabs: [TerminalTab] = [.welcome],
@@ -35,6 +39,13 @@ final class AppState {
 
     func toggleSFTPDrawer() {
         isSFTPDrawerVisible.toggle()
+    }
+
+    func refreshRemoteFiles() {
+        remoteFiles = [
+            RemoteFile(name: "app.tar.gz", path: "\(remotePath)/app.tar.gz", kind: .file, size: 2048),
+            RemoteFile(name: "logs", path: "\(remotePath)/logs", kind: .directory, size: 0)
+        ]
     }
 
     func beginNewConnection() {

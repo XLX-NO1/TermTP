@@ -15,7 +15,7 @@ struct RootView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if state.isSFTPDrawerVisible {
-                SFTPDrawerView(transfers: state.transfers)
+                SFTPDrawerView(state: state)
                     .frame(width: 300)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }

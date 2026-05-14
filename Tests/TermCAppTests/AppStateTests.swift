@@ -1,4 +1,5 @@
 import Testing
+import TermCCore
 @testable import TermCApp
 
 @MainActor
@@ -31,4 +32,16 @@ import Testing
     state.saveDraftConnection()
 
     #expect(state.connections.isEmpty)
+}
+
+@Test func refreshRemoteFilesListsArchiveAndLogsUnderCurrentRemotePath() {
+    let state = AppState()
+    state.remotePath = "/srv/app"
+
+    state.refreshRemoteFiles()
+
+    #expect(state.remoteFiles == [
+        RemoteFile(name: "app.tar.gz", path: "/srv/app/app.tar.gz", kind: .file, size: 2048),
+        RemoteFile(name: "logs", path: "/srv/app/logs", kind: .directory, size: 0)
+    ])
 }
