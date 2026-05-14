@@ -16,4 +16,12 @@ final class SSHConfigurationTests: XCTestCase {
         XCTAssertEqual(summary.authenticationKind, .publicKey)
         XCTAssertEqual(summary.privateKeyPath, "/tmp/key")
     }
+
+    func testPublicKeyAuthenticationRejectsPasswordCredential() {
+        let record = ConnectionRecord(alias: "Key", host: "host", username: "deploy", authentication: .publicKey(privateKeyPath: "/tmp/key"))
+
+        XCTAssertThrowsError(try CitadelSSHClient().authenticationMethod(for: record, credential: .password("pw"))) { error in
+            XCTAssertEqual(error as? SSHClientAdapterError, .missingCredential)
+        }
+    }
 }

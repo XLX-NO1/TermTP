@@ -2,8 +2,6 @@ import Citadel
 import Crypto
 import Foundation
 
-extension SSHClient: @retroactive @unchecked Sendable {}
-
 public struct SSHConfigurationSummary: Equatable, Sendable {
     public var host: String
     public var port: UInt16
@@ -46,7 +44,7 @@ public struct CitadelSSHClient: SSHClientProviding {
         return CitadelSSHSession(record: record, client: client)
     }
 
-    private func authenticationMethod(for record: ConnectionRecord, credential: Credential?) throws -> SSHAuthenticationMethod {
+    func authenticationMethod(for record: ConnectionRecord, credential: Credential?) throws -> SSHAuthenticationMethod {
         switch record.authentication {
         case .password:
             guard case .password(let password) = credential else {
@@ -55,6 +53,9 @@ public struct CitadelSSHClient: SSHClientProviding {
             return .passwordBased(username: record.username, password: password)
 
         case .publicKey(let privateKeyPath):
+            if case .password = credential {
+                throw SSHClientAdapterError.missingCredential
+            }
             guard let key = try? String(contentsOfFile: privateKeyPath, encoding: .utf8) else {
                 throw SSHClientAdapterError.invalidPrivateKey
             }
@@ -81,16 +82,24 @@ public struct CitadelSSHClient: SSHClientProviding {
     }
 }
 
+private final class CitadelSSHClientBox: @unchecked Sendable {
+    let client: SSHClient
+
+    init(_ client: SSHClient) {
+        self.client = client
+    }
+}
+
 public actor CitadelSSHSession: SSHSessionProviding {
     public let id = UUID()
     public let record: ConnectionRecord
-    private let client: SSHClient
+    private let clientBox: CitadelSSHClientBox
     private var currentState: SSHSessionState = .connected
     private var output = ""
 
     public init(record: ConnectionRecord, client: SSHClient) {
         self.record = record
-        self.client = client
+        self.clientBox = CitadelSSHClientBox(client)
     }
 
     public var state: SSHSessionState {
@@ -108,7 +117,8 @@ public actor CitadelSSHSession: SSHSessionProviding {
     }
 
     public func disconnect() async throws {
-        try await client.close()
+        // The Citadel client is only reachable through this actor after construction.
+        try await clientBox.client.close()
         currentState = .disconnected
     }
 }
