@@ -12,7 +12,7 @@ let package = Package(
         .executable(name: "TermCIconTool", targets: ["TermCIconTool"])
     ],
     dependencies: [
-        .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", branch: "main"),
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", revision: "73576f6f838414bab4c230cd1b56237bd16c3bbf"),
         .package(url: "https://github.com/orlandos-nl/Citadel.git", from: "0.9.2")
     ],
     targets: [

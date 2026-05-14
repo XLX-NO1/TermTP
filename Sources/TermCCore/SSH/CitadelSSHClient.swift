@@ -27,17 +27,27 @@ public enum SSHClientAdapterError: Error, Equatable {
     case missingCredential
     case invalidPrivateKey
     case unsupportedPrivateKey
+    case hostKeyVerificationRequired
+}
+
+public enum SSHHostKeyPolicy: Equatable, Sendable {
+    case strict
+    case insecureAcceptAnyHostKey
 }
 
 public struct CitadelSSHClient: SSHClientProviding {
-    public init() {}
+    private let hostKeyPolicy: SSHHostKeyPolicy
+
+    public init(hostKeyPolicy: SSHHostKeyPolicy = .strict) {
+        self.hostKeyPolicy = hostKeyPolicy
+    }
 
     public func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
         let client = try await SSHClient.connect(
             host: record.host,
             port: Int(record.port),
             authenticationMethod: try authenticationMethod(for: record, credential: credential),
-            hostKeyValidator: .acceptAnything(),
+            hostKeyValidator: try makeHostKeyValidator(),
             reconnect: .never
         )
 
@@ -71,6 +81,15 @@ public struct CitadelSSHClient: SSHClientProviding {
             default:
                 throw SSHClientAdapterError.unsupportedPrivateKey
             }
+        }
+    }
+
+    func makeHostKeyValidator() throws -> SSHHostKeyValidator {
+        switch hostKeyPolicy {
+        case .strict:
+            throw SSHClientAdapterError.hostKeyVerificationRequired
+        case .insecureAcceptAnyHostKey:
+            return .acceptAnything()
         }
     }
 

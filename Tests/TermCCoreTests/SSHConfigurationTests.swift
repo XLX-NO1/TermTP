@@ -24,4 +24,14 @@ final class SSHConfigurationTests: XCTestCase {
             XCTAssertEqual(error as? SSHClientAdapterError, .missingCredential)
         }
     }
+
+    func testDefaultHostKeyPolicyRequiresExplicitVerificationStrategy() {
+        XCTAssertThrowsError(try CitadelSSHClient().makeHostKeyValidator()) { error in
+            XCTAssertEqual(error as? SSHClientAdapterError, .hostKeyVerificationRequired)
+        }
+    }
+
+    func testInsecureHostKeyPolicyIsExplicitOptIn() throws {
+        _ = try CitadelSSHClient(hostKeyPolicy: .insecureAcceptAnyHostKey).makeHostKeyValidator()
+    }
 }
