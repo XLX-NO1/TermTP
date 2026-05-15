@@ -45,7 +45,7 @@ struct LocalSSHTerminalView: NSViewRepresentable {
 
     private func startSSH(in terminalView: LocalProcessTerminalView, context: Context) {
         context.coordinator.startedConnectionID = connection.id
-        let launch = launchConfiguration(for: connection, credential: credential)
+        let launch = Self.launchConfiguration(for: connection, credential: credential)
         terminalView.startProcess(
             executable: launch.executable,
             args: launch.args,
@@ -53,30 +53,59 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         )
     }
 
-    private func launchConfiguration(
+    struct LaunchConfiguration {
+        var executable: String
+        var args: [String]
+        var environment: [String]?
+    }
+
+    static func launchConfiguration(
         for connection: ConnectionRecord,
         credential: Credential?
-    ) -> (executable: String, args: [String], environment: [String]?) {
+    ) -> LaunchConfiguration {
         guard
             case .password(let password) = credential,
             !password.isEmpty
         else {
-            return ("/usr/bin/ssh", sshArguments(for: connection), nil)
+            return LaunchConfiguration(
+                executable: "/usr/bin/ssh",
+                args: sshArguments(for: connection),
+                environment: nil
+            )
         }
 
-        return (
-            "/usr/bin/ssh",
-            sshArguments(for: connection),
-            [
-                "TERMTP_SSH_PASSWORD=\(password)",
-                "SSH_ASKPASS=\(askPassScriptPath())",
-                "SSH_ASKPASS_REQUIRE=force",
-                "DISPLAY=termtp:0"
-            ]
+        return LaunchConfiguration(
+            executable: "/usr/bin/ssh",
+            args: sshArguments(for: connection),
+            environment: terminalEnvironment(additionalValues: [
+                "TERMTP_SSH_PASSWORD": password,
+                "SSH_ASKPASS": askPassScriptPath(),
+                "SSH_ASKPASS_REQUIRE": "force",
+                "DISPLAY": "termtp:0"
+            ])
         )
     }
 
-    private func askPassScriptPath() -> String {
+    private static func terminalEnvironment(additionalValues: [String: String]) -> [String] {
+        var values: [String: String] = [:]
+        for entry in Terminal.getEnvironmentVariables(termName: "xterm-256color") {
+            guard let separator = entry.firstIndex(of: "=") else {
+                continue
+            }
+
+            values[String(entry[..<separator])] = String(entry[entry.index(after: separator)...])
+        }
+
+        additionalValues.forEach { key, value in
+            values[key] = value
+        }
+
+        return values
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value)" }
+    }
+
+    private static func askPassScriptPath() -> String {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("termtp-ssh-askpass.sh")
         let script = """
@@ -112,7 +141,7 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         return menu
     }
 
-    private func sshArguments(for connection: ConnectionRecord) -> [String] {
+    private static func sshArguments(for connection: ConnectionRecord) -> [String] {
         var args = [
             "-o", "StrictHostKeyChecking=accept-new",
             "-p", String(connection.port),

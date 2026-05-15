@@ -1,12 +1,16 @@
 import AppKit
 
 @MainActor
-final class MenuBarController {
+final class MenuBarController: NSObject {
     static let menuBarIconSize = NSSize(width: 18, height: 18)
 
     private var statusItem: NSStatusItem?
+    private var state: AppState?
+    private var windowController: TermTPWindowController?
 
-    func install(state: AppState) {
+    func install(state: AppState, windowController: TermTPWindowController) {
+        self.state = state
+        self.windowController = windowController
         if statusItem != nil {
             return
         }
@@ -20,7 +24,7 @@ final class MenuBarController {
         menu.addItem(
             NSMenuItem(
                 title: "Show TermTP",
-                action: #selector(showTermC),
+                action: #selector(showTermC(_:)),
                 keyEquivalent: ""
             )
         )
@@ -35,7 +39,7 @@ final class MenuBarController {
         menu.addItem(
             NSMenuItem(
                 title: "Quit TermTP",
-                action: #selector(quitTermTP),
+                action: #selector(quitTermTP(_:)),
                 keyEquivalent: "q"
             )
         )
@@ -44,28 +48,27 @@ final class MenuBarController {
             menuItem.target = self
         }
 
-        menu.item(withTitle: "New Connection")?.representedObject = state
         item.menu = menu
         statusItem = item
     }
 
-    @objc private func showTermC() {
-        NSApp.activate(ignoringOtherApps: true)
-        for window in NSApp.windows where window.canBecomeMain {
-            window.makeKeyAndOrderFront(nil)
+    @objc func showTermC(_ sender: Any?) {
+        DispatchQueue.main.async { [weak self] in
+            self?.windowController?.showWindow()
         }
     }
 
-    @objc private func newConnection(_ sender: NSMenuItem) {
-        guard let state = sender.representedObject as? AppState else {
+    @objc func newConnection(_ sender: NSMenuItem) {
+        guard state != nil else {
             return
         }
 
-        showTermC()
-        state.beginNewConnection()
+        DispatchQueue.main.async { [weak self] in
+            self?.windowController?.showNewConnection()
+        }
     }
 
-    @objc private func quitTermTP() {
+    @objc func quitTermTP(_ sender: Any?) {
         NSApp.terminate(nil)
     }
 

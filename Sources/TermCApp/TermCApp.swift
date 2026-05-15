@@ -2,35 +2,22 @@ import SwiftUI
 
 @main
 struct TermCApp: App {
-    @State private var state = AppState()
-    @State private var menuBarController = MenuBarController()
+    @NSApplicationDelegateAdaptor(TermTPAppDelegate.self)
+    private var appDelegate
 
     var body: some Scene {
-        WindowGroup("TermTP") {
-            RootView(state: state)
-                .frame(
-                    minWidth: AppLayout.minimumWindowWidth,
-                    minHeight: AppLayout.minimumWindowHeight
-                )
-                .task {
-                    menuBarController.install(state: state)
-                    await state.loadConnections()
-                }
+        Settings {
+            EmptyView()
         }
-        .windowStyle(.hiddenTitleBar)
-        .defaultSize(
-            width: AppLayout.defaultWindowWidth,
-            height: AppLayout.defaultWindowHeight
-        )
         .commands {
             CommandMenu("View") {
                 Button("Toggle Connections") {
-                    state.toggleSidebar()
+                    appDelegate.state.toggleSidebar()
                 }
                 .keyboardShortcut("1", modifiers: [.command, .option])
 
                 Button("Toggle SFTP Drawer") {
-                    state.toggleSFTPDrawer()
+                    appDelegate.state.toggleSFTPDrawer()
                 }
                 .keyboardShortcut("2", modifiers: [.command, .option])
             }
