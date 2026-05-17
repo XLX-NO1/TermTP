@@ -4,6 +4,7 @@ import TermCCore
 struct TerminalWorkspaceView: View {
     let tabs: [TerminalTab]
     @Binding var selectedTabID: TerminalTab.ID?
+    var onSelectTab: (TerminalTab.ID) -> Void = { _ in }
     var onCloseTab: (TerminalTab.ID) -> Void = { _ in }
     var onTerminalInput: (String) -> Void = { _ in }
 
@@ -47,7 +48,7 @@ struct TerminalWorkspaceView: View {
         HStack(spacing: 5) {
             ForEach(tabs) { tab in
                 Button {
-                    selectedTabID = tab.id
+                    onSelectTab(tab.id)
                 } label: {
                     HStack(spacing: 5) {
                         Circle()

@@ -12,6 +12,11 @@ struct RootView: View {
                     TerminalWorkspaceView(
                         tabs: state.tabs,
                         selectedTabID: $state.selectedTabID,
+                        onSelectTab: { tabID in
+                            Task {
+                                await state.selectTab(tabID)
+                            }
+                        },
                         onCloseTab: state.closeTab,
                         onTerminalInput: state.sendInputToSelectedTab
                     )

@@ -90,7 +90,19 @@ final class AppState {
         if selectedTabID == id {
             let nextIndex = min(index, tabs.count - 1)
             selectedTabID = tabs[nextIndex].id
+            remotePath = tabs[nextIndex].remotePath
+            remoteFiles = []
         }
+    }
+
+    func selectTab(_ id: TerminalTab.ID) async {
+        guard let tab = tabs.first(where: { $0.id == id }) else {
+            return
+        }
+
+        selectedTabID = id
+        remotePath = tab.remotePath
+        await refreshRemoteFiles()
     }
 
     func clearHistory() {
@@ -143,6 +155,8 @@ final class AppState {
     }
 
     func refreshRemoteFiles() async {
+        saveRemotePathForSelectedTab()
+
         guard let session = selectedSession else {
             remoteFiles = []
             return
@@ -161,6 +175,7 @@ final class AppState {
         }
 
         remotePath = file.path
+        saveRemotePathForSelectedTab()
         await refreshRemoteFiles()
     }
 
@@ -171,6 +186,7 @@ final class AppState {
 
         let parent = URL(fileURLWithPath: remotePath).deletingLastPathComponent().path
         remotePath = parent == "/" || parent.isEmpty ? "." : parent
+        saveRemotePathForSelectedTab()
         await refreshRemoteFiles()
     }
 
@@ -181,6 +197,7 @@ final class AppState {
         }
 
         remotePath = trimmedPath
+        saveRemotePathForSelectedTab()
         await refreshRemoteFiles()
     }
 
@@ -458,6 +475,17 @@ final class AppState {
         tabs[index].session = session
     }
 
+    private func saveRemotePathForSelectedTab() {
+        guard
+            let selectedTabID,
+            let index = tabs.firstIndex(where: { $0.id == selectedTabID })
+        else {
+            return
+        }
+
+        tabs[index].remotePath = remotePath
+    }
+
     private func appendTransfer(
         direction: TransferRecord.Direction,
         localPath: String,
@@ -592,6 +620,7 @@ struct TerminalTab: Identifiable, Equatable {
     var title: String
     var state: SSHSessionState
     var transcript: String
+    var remotePath: String
     var localProcess: TerminalLocalProcess?
     var session: SSHSessionProviding?
 
@@ -600,6 +629,7 @@ struct TerminalTab: Identifiable, Equatable {
         title: String,
         state: SSHSessionState,
         transcript: String,
+        remotePath: String = ".",
         localProcess: TerminalLocalProcess? = nil,
         session: SSHSessionProviding? = nil
     ) {
@@ -607,6 +637,7 @@ struct TerminalTab: Identifiable, Equatable {
         self.title = title
         self.state = state
         self.transcript = transcript
+        self.remotePath = remotePath
         self.localProcess = localProcess
         self.session = session
     }
@@ -616,6 +647,7 @@ struct TerminalTab: Identifiable, Equatable {
             && lhs.title == rhs.title
             && lhs.state == rhs.state
             && lhs.transcript == rhs.transcript
+            && lhs.remotePath == rhs.remotePath
             && lhs.localProcess == rhs.localProcess
     }
 }

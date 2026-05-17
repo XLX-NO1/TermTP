@@ -145,6 +145,46 @@ import TermCCore
 }
 
 @MainActor
+@Test func selectingTabRestoresThatTabsRemotePathAndFiles() async {
+    let firstSession = FakeSSHSession(record: .samplePassword)
+    let secondSession = FakeSSHSession(record: ConnectionRecord(
+        alias: "Logs",
+        host: "logs.example.com",
+        username: "deploy",
+        authentication: .password
+    ))
+    let first = TerminalTab(title: "First", state: .connected, transcript: "", session: firstSession)
+    let second = TerminalTab(title: "Second", state: .connected, transcript: "", session: secondSession)
+    let service = FakeSFTPService()
+    let state = AppState(tabs: [first, second], connections: [], sftpService: service)
+    state.selectedTabID = first.id
+
+    try? await service.makeDirectory(remotePath: "/srv", session: firstSession)
+    try? await service.makeDirectory(remotePath: "/srv/app", session: firstSession)
+    try? await service.upload(localPath: "/tmp/app.txt", remotePath: "/srv/app/app.txt", session: firstSession)
+    try? await service.makeDirectory(remotePath: "/var", session: secondSession)
+    try? await service.makeDirectory(remotePath: "/var/log", session: secondSession)
+    try? await service.upload(localPath: "/tmp/system.log", remotePath: "/var/log/system.log", session: secondSession)
+
+    await state.openRemotePath("/srv/app")
+    await state.selectTab(second.id)
+    await state.openRemotePath("/var/log")
+    await state.selectTab(first.id)
+
+    #expect(state.remotePath == "/srv/app")
+    #expect(state.remoteFiles == [
+        RemoteFile(name: "app.txt", path: "/srv/app/app.txt", kind: .file, size: 1)
+    ])
+
+    await state.selectTab(second.id)
+
+    #expect(state.remotePath == "/var/log")
+    #expect(state.remoteFiles == [
+        RemoteFile(name: "system.log", path: "/var/log/system.log", kind: .file, size: 1)
+    ])
+}
+
+@MainActor
 @Test func openRemoteDirectoryChangesPathAndListsChildren() async {
     let service = FakeSFTPService()
     let session = FakeSSHSession(record: .samplePassword)
