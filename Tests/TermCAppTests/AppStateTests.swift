@@ -59,7 +59,7 @@ import TermCCore
 @MainActor
 @Test func connectDraftConnectionCreatesConnectedTabAndLoadsRemoteFiles() async {
     let sftpService = RecordingSFTPService(filesByPath: [
-        ".": [RemoteFile(name: "readme.txt", path: "./readme.txt", kind: .file, size: 12)]
+        "/var/www": [RemoteFile(name: "readme.txt", path: "/var/www/readme.txt", kind: .file, size: 12)]
     ])
     let state = AppState(connections: [], sshClient: FakeSSHClient(), sftpService: sftpService)
     state.draftAlias = "Prod"
@@ -67,6 +67,7 @@ import TermCCore
     state.draftPort = "22"
     state.draftUsername = "deploy"
     state.draftPassword = "secret"
+    state.draftDefaultRemotePath = " /var/www "
 
     await state.connectDraftConnection()
 
@@ -77,9 +78,10 @@ import TermCCore
     #expect(state.tabs.last?.transcript.contains("Connected to deploy@example.com:22") == true)
     #expect(state.tabs.last?.localProcess == .ssh(state.connections[0], credential: .password("secret")))
     #expect(state.selectedTabID == state.tabs.last?.id)
-    #expect(state.remotePath == ".")
-    #expect(state.remoteFiles == [RemoteFile(name: "readme.txt", path: "./readme.txt", kind: .file, size: 12)])
-    #expect(await sftpService.listedPaths == ["."])
+    #expect(state.connections[0].defaultRemotePath == "/var/www")
+    #expect(state.remotePath == "/var/www")
+    #expect(state.remoteFiles == [RemoteFile(name: "readme.txt", path: "/var/www/readme.txt", kind: .file, size: 12)])
+    #expect(await sftpService.listedPaths == ["/var/www"])
 }
 
 @MainActor

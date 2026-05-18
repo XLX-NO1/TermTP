@@ -44,6 +44,7 @@ final class AppState {
     var draftKeepAliveInterval = "30"
     var draftKeepAliveMaxCount = "3"
     var draftJumpHost = ""
+    var draftDefaultRemotePath = ""
     var draftForwardEnabled = false
     var draftForwardDirection = ConnectionRecord.PortForward.Direction.local
     var draftForwardBindAddress = "127.0.0.1"
@@ -471,6 +472,7 @@ final class AppState {
         draftKeepAliveInterval = "30"
         draftKeepAliveMaxCount = "3"
         draftJumpHost = ""
+        draftDefaultRemotePath = ""
         draftForwardEnabled = false
         draftForwardDirection = .local
         draftForwardBindAddress = "127.0.0.1"
@@ -547,6 +549,7 @@ final class AppState {
         )
         tabs.append(tab)
         selectedTabID = tab.id
+        setRemotePath(connection.defaultRemotePath ?? ".", for: tab.id)
 
         if connection.requiresLocalSSHOnly {
             updateTab(
@@ -618,6 +621,7 @@ final class AppState {
         let username = draftUsername.trimmingCharacters(in: .whitespacesAndNewlines)
         let privateKeyPath = draftPrivateKeyPath.trimmingCharacters(in: .whitespacesAndNewlines)
         let jumpHost = draftJumpHost.trimmingCharacters(in: .whitespacesAndNewlines)
+        let defaultRemotePath = draftDefaultRemotePath.trimmingCharacters(in: .whitespacesAndNewlines)
         let keepAliveInterval = Int(draftKeepAliveInterval.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 30
         let keepAliveMaxCount = Int(draftKeepAliveMaxCount.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 3
         let forwardLocalPort = UInt16(draftForwardLocalPort.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -657,7 +661,8 @@ final class AppState {
                 localPort: forwardLocalPort,
                 destinationHost: forwardDestinationHost,
                 destinationPort: forwardDestinationPort
-            )
+            ),
+            defaultRemotePath: defaultRemotePath.isEmpty ? nil : defaultRemotePath
         )
     }
 
@@ -768,6 +773,17 @@ final class AppState {
         }
 
         tabs[index].remotePath = remotePath
+    }
+
+    private func setRemotePath(_ path: String, for tabID: TerminalTab.ID) {
+        let normalizedPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        let nextPath = normalizedPath.isEmpty ? "." : normalizedPath
+        if let index = tabs.firstIndex(where: { $0.id == tabID }) {
+            tabs[index].remotePath = nextPath
+        }
+        if selectedTabID == tabID {
+            remotePath = nextPath
+        }
     }
 
     private func updateRemoteFiles(_ files: [RemoteFile], path: String, tabID: TerminalTab.ID) {

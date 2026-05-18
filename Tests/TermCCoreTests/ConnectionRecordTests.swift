@@ -12,6 +12,7 @@ final class ConnectionRecordTests: XCTestCase {
             authentication: .publicKey(privateKeyPath: "/Users/me/.ssh/id_ed25519"),
             tags: ["prod", "api"],
             isFavorite: true,
+            defaultRemotePath: "/var/www",
             lastConnectedAt: Date(timeIntervalSince1970: 100),
             createdAt: Date(timeIntervalSince1970: 1),
             updatedAt: Date(timeIntervalSince1970: 2)
@@ -61,5 +62,6 @@ final class ConnectionRecordTests: XCTestCase {
         XCTAssertEqual(record.keepAlive, .init())
         XCTAssertNil(record.jumpHost)
         XCTAssertTrue(record.portForwards.isEmpty)
+        XCTAssertNil(record.defaultRemotePath)
     }
 }

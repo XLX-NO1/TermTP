@@ -77,6 +77,7 @@ struct AppStrings: Equatable, Sendable {
     var aliveIntervalSeconds: String { self["aliveIntervalSeconds"] }
     var aliveMaxCount: String { self["aliveMaxCount"] }
     var jumpHost: String { self["jumpHost"] }
+    var defaultRemotePath: String { self["defaultRemotePath"] }
     var portForwarding: String { self["portForwarding"] }
     var enableForwarding: String { self["enableForwarding"] }
     var type: String { self["type"] }
@@ -163,6 +164,7 @@ struct AppStrings: Equatable, Sendable {
             "aliveIntervalSeconds": "保活间隔秒数",
             "aliveMaxCount": "保活最大次数",
             "jumpHost": "跳板机",
+            "defaultRemotePath": "默认远程目录",
             "portForwarding": "端口转发",
             "enableForwarding": "启用转发",
             "type": "类型",
@@ -246,6 +248,7 @@ struct AppStrings: Equatable, Sendable {
             "aliveIntervalSeconds": "Alive interval seconds",
             "aliveMaxCount": "Alive max count",
             "jumpHost": "Jump host",
+            "defaultRemotePath": "Default remote path",
             "portForwarding": "Port Forwarding",
             "enableForwarding": "Enable forwarding",
             "type": "Type",

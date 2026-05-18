@@ -58,6 +58,7 @@ struct ConnectionFormView: View {
                     }
 
                     TextField(state.t.jumpHost, text: $state.draftJumpHost)
+                    TextField(state.t.defaultRemotePath, text: $state.draftDefaultRemotePath)
                 }
 
                 Section(state.t.portForwarding) {

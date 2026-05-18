@@ -76,6 +76,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
     public var keepAlive: KeepAlive
     public var jumpHost: String?
     public var portForwards: [PortForward]
+    public var defaultRemotePath: String?
     public var lastConnectedAt: Date?
     public var createdAt: Date
     public var updatedAt: Date
@@ -92,6 +93,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
         keepAlive: KeepAlive = KeepAlive(),
         jumpHost: String? = nil,
         portForwards: [PortForward] = [],
+        defaultRemotePath: String? = nil,
         lastConnectedAt: Date? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
@@ -107,6 +109,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
         self.keepAlive = keepAlive
         self.jumpHost = jumpHost
         self.portForwards = portForwards
+        self.defaultRemotePath = defaultRemotePath
         self.lastConnectedAt = lastConnectedAt
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -124,6 +127,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
         case keepAlive
         case jumpHost
         case portForwards
+        case defaultRemotePath
         case lastConnectedAt
         case createdAt
         case updatedAt
@@ -142,6 +146,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
         self.keepAlive = try container.decodeIfPresent(KeepAlive.self, forKey: .keepAlive) ?? KeepAlive()
         self.jumpHost = try container.decodeIfPresent(String.self, forKey: .jumpHost)
         self.portForwards = try container.decodeIfPresent([PortForward].self, forKey: .portForwards) ?? []
+        self.defaultRemotePath = try container.decodeIfPresent(String.self, forKey: .defaultRemotePath)
         self.lastConnectedAt = try container.decodeIfPresent(Date.self, forKey: .lastConnectedAt)
         self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         self.updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
