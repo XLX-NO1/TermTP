@@ -142,29 +142,16 @@ struct RootView: View {
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
             .help(state.t.commandSnippets)
 
-            Button {
-                state.decreaseTerminalFontSize()
-            } label: {
-                Image(systemName: "textformat.size.smaller")
-                    .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 28, height: 22)
+            Picker(state.t.fontSize, selection: $state.terminalFontSize) {
+                ForEach(state.terminalFontSizeOptions, id: \.self) { size in
+                    Text("\(Int(size))").tag(size)
+                }
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.white.opacity(0.86))
-            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
-            .help(state.t.smallerFont)
-
-            Button {
-                state.increaseTerminalFontSize()
-            } label: {
-                Image(systemName: "textformat.size.larger")
-                    .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 28, height: 22)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.white.opacity(0.86))
-            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
-            .help(state.t.largerFont)
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .frame(width: 58)
+            .help(state.t.fontSize)
 
             Spacer(minLength: 0)
         }

@@ -71,9 +71,13 @@ final class AppState {
         TerminalPalette.palette(for: terminalTheme)
     }
 
+    var terminalFontSizeOptions: [Double] {
+        Self.terminalFontSizeOptions
+    }
+
     private static let languageDefaultsKey = "TermTP.language"
     private static let terminalThemeDefaultsKey = "TermTP.terminalTheme"
-    private static let terminalFontSteps: [Double] = [9, 10, 12, 13, 15, 17, 18]
+    private static let terminalFontSizeOptions: [Double] = Array(9...18).map(Double.init)
     private let defaults: UserDefaults
 
     init(
@@ -286,19 +290,11 @@ final class AppState {
     }
 
     func increaseTerminalFontSize() {
-        terminalFontSize = nextTerminalFontSize(after: terminalFontSize)
+        terminalFontSize = min(18, terminalFontSize + 1)
     }
 
     func decreaseTerminalFontSize() {
-        terminalFontSize = previousTerminalFontSize(before: terminalFontSize)
-    }
-
-    private func nextTerminalFontSize(after size: Double) -> Double {
-        Self.terminalFontSteps.first { $0 > size } ?? Self.terminalFontSteps.last ?? size
-    }
-
-    private func previousTerminalFontSize(before size: Double) -> Double {
-        Self.terminalFontSteps.last { $0 < size } ?? Self.terminalFontSteps.first ?? size
+        terminalFontSize = max(9, terminalFontSize - 1)
     }
 
     func refreshRemoteFiles() async {

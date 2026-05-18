@@ -113,6 +113,7 @@ struct AppStrings: Equatable, Sendable {
     var serverStatus: String { self["serverStatus"] }
     var smallerFont: String { self["smallerFont"] }
     var largerFont: String { self["largerFont"] }
+    var fontSize: String { self["fontSize"] }
     var refresh: String { self["refresh"] }
     var parentDirectory: String { self["parentDirectory"] }
     var remotePath: String { self["remotePath"] }
@@ -227,6 +228,7 @@ struct AppStrings: Equatable, Sendable {
             "serverStatus": "服务器状态",
             "smallerFont": "减小字体",
             "largerFont": "增大字体",
+            "fontSize": "字体大小",
             "refresh": "刷新",
             "parentDirectory": "上级目录",
             "remotePath": "远程路径",
@@ -324,6 +326,7 @@ struct AppStrings: Equatable, Sendable {
             "serverStatus": "Server status",
             "smallerFont": "Smaller Font",
             "largerFont": "Larger Font",
+            "fontSize": "Font Size",
             "refresh": "Refresh",
             "parentDirectory": "Parent Directory",
             "remotePath": "Remote path",
@@ -423,6 +426,7 @@ struct AppStrings: Equatable, Sendable {
             "serverStatus": "Server status",
             "smallerFont": "Smaller Font",
             "largerFont": "Larger Font",
+            "fontSize": "Font Size",
             "refresh": "Refresh",
             "parentDirectory": "Parent Directory",
             "remotePath": "Remote path",
@@ -520,6 +524,7 @@ struct AppStrings: Equatable, Sendable {
             "serverStatus": "Server status",
             "smallerFont": "Smaller Font",
             "largerFont": "Larger Font",
+            "fontSize": "Font Size",
             "refresh": "Refresh",
             "parentDirectory": "Parent Directory",
             "remotePath": "Remote path",
@@ -617,6 +622,7 @@ struct AppStrings: Equatable, Sendable {
             "serverStatus": "Server status",
             "smallerFont": "Smaller Font",
             "largerFont": "Larger Font",
+            "fontSize": "Font Size",
             "refresh": "Refresh",
             "parentDirectory": "Parent Directory",
             "remotePath": "Remote path",
@@ -714,6 +720,7 @@ struct AppStrings: Equatable, Sendable {
             "serverStatus": "Server status",
             "smallerFont": "Smaller Font",
             "largerFont": "Larger Font",
+            "fontSize": "Font Size",
             "refresh": "Refresh",
             "parentDirectory": "Parent Directory",
             "remotePath": "Remote path",
@@ -811,6 +818,7 @@ struct AppStrings: Equatable, Sendable {
             "serverStatus": "Server status",
             "smallerFont": "Smaller Font",
             "largerFont": "Larger Font",
+            "fontSize": "Font Size",
             "refresh": "Refresh",
             "parentDirectory": "Parent Directory",
             "remotePath": "Remote path",
@@ -908,6 +916,7 @@ struct AppStrings: Equatable, Sendable {
             "serverStatus": "Server status",
             "smallerFont": "Smaller Font",
             "largerFont": "Larger Font",
+            "fontSize": "Font Size",
             "refresh": "Refresh",
             "parentDirectory": "Parent Directory",
             "remotePath": "Remote path",
@@ -1005,6 +1014,7 @@ struct AppStrings: Equatable, Sendable {
             "serverStatus": "Server status",
             "smallerFont": "Smaller Font",
             "largerFont": "Larger Font",
+            "fontSize": "Font Size",
             "refresh": "Refresh",
             "parentDirectory": "Parent Directory",
             "remotePath": "Remote path",
