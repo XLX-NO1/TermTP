@@ -4,6 +4,19 @@ import TermCCore
 @testable import TermCApp
 
 @MainActor
+@Test func terminalFontButtonsChangeSizeByVisibleSteps() {
+    let state = AppState(connections: [])
+
+    state.increaseTerminalFontSize()
+
+    #expect(state.terminalFontSize == 13)
+
+    state.decreaseTerminalFontSize()
+
+    #expect(state.terminalFontSize == 11)
+}
+
+@MainActor
 @Test func showNotificationStoresUserVisibleMessageAndDismissesIt() {
     let state = AppState(connections: [], language: .zhHans)
 
