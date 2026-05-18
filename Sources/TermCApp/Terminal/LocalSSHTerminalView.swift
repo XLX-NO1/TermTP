@@ -7,6 +7,7 @@ struct LocalSSHTerminalView: NSViewRepresentable {
     let connection: ConnectionRecord
     let credential: Credential?
     var fontSize: Double = 11
+    var palette = TerminalPalette.palette(for: .classicGreen)
     var strings = AppStrings(language: .zhHans)
     var pendingCommand: TerminalCommand?
     var onCommandHandled: (TerminalCommand.ID) -> Void = { _ in }
@@ -38,15 +39,10 @@ struct LocalSSHTerminalView: NSViewRepresentable {
     private func configure(_ terminalView: LocalProcessTerminalView) {
         terminalView.autoresizingMask = [.width, .height]
         terminalView.font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
-        terminalView.nativeBackgroundColor = .black
-        terminalView.nativeForegroundColor = NSColor(
-            calibratedRed: 0.45,
-            green: 1.0,
-            blue: 0.55,
-            alpha: 1.0
-        )
+        terminalView.nativeBackgroundColor = palette.background.nsColor
+        terminalView.nativeForegroundColor = palette.foreground.nsColor
         terminalView.caretColor = terminalView.nativeForegroundColor
-        terminalView.layer?.backgroundColor = NSColor.black.cgColor
+        terminalView.layer?.backgroundColor = palette.background.nsColor.cgColor
         terminalView.menu = terminalContextMenu(for: terminalView, strings: strings)
     }
 
@@ -276,6 +272,12 @@ extension LocalSSHTerminalView {
     func localized(_ strings: AppStrings) -> LocalSSHTerminalView {
         var view = self
         view.strings = strings
+        return view
+    }
+
+    func themed(_ palette: TerminalPalette) -> LocalSSHTerminalView {
+        var view = self
+        view.palette = palette
         return view
     }
 }

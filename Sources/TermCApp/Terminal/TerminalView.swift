@@ -5,6 +5,7 @@ import SwiftUI
 struct TerminalView: NSViewRepresentable {
     var transcript: String
     var fontSize: Double = 11
+    var palette = TerminalPalette.palette(for: .classicGreen)
     var onInput: (String) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator {
@@ -28,15 +29,10 @@ struct TerminalView: NSViewRepresentable {
     private func configure(_ terminalView: SwiftTerm.TerminalView) {
         terminalView.autoresizingMask = [.width, .height]
         terminalView.font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
-        terminalView.nativeBackgroundColor = .black
-        terminalView.nativeForegroundColor = NSColor(
-            calibratedRed: 0.45,
-            green: 1.0,
-            blue: 0.55,
-            alpha: 1.0
-        )
+        terminalView.nativeBackgroundColor = palette.background.nsColor
+        terminalView.nativeForegroundColor = palette.foreground.nsColor
         terminalView.caretColor = terminalView.nativeForegroundColor
-        terminalView.layer?.backgroundColor = NSColor.black.cgColor
+        terminalView.layer?.backgroundColor = palette.background.nsColor.cgColor
     }
 
     @MainActor

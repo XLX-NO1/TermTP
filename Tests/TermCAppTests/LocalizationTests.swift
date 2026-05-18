@@ -35,3 +35,20 @@ import Testing
     #expect(state.language == .en)
     #expect(state.t.cancel == "Cancel")
 }
+
+@MainActor
+@Test func terminalThemeDefaultsToClassicGreenAndCanBeChanged() {
+    let state = AppState(connections: [], terminalTheme: .classicGreen)
+
+    state.terminalTheme = .amber
+
+    #expect(TerminalTheme.default == .classicGreen)
+    #expect(TerminalTheme.allCases.map(\.rawValue) == [
+        "classicGreen",
+        "amber",
+        "paperWhite",
+        "ocean"
+    ])
+    #expect(state.terminalTheme == .amber)
+    #expect(state.terminalPalette.foreground.red > state.terminalPalette.foreground.green)
+}

@@ -20,6 +20,11 @@ final class AppState {
     var isSidebarVisible = true
     var isSFTPDrawerVisible = true
     var terminalFontSize: Double = 11
+    var terminalTheme: TerminalTheme {
+        didSet {
+            defaults.set(terminalTheme.rawValue, forKey: Self.terminalThemeDefaultsKey)
+        }
+    }
     var language: AppLanguage {
         didSet {
             defaults.set(language.rawValue, forKey: Self.languageDefaultsKey)
@@ -59,7 +64,12 @@ final class AppState {
         AppStrings(language: language)
     }
 
+    var terminalPalette: TerminalPalette {
+        TerminalPalette.palette(for: terminalTheme)
+    }
+
     private static let languageDefaultsKey = "TermTP.language"
+    private static let terminalThemeDefaultsKey = "TermTP.terminalTheme"
     private let defaults: UserDefaults
 
     init(
@@ -67,6 +77,7 @@ final class AppState {
         connections: [ConnectionRecord] = [.samplePassword],
         transfers: [TransferRecord] = [],
         language: AppLanguage? = nil,
+        terminalTheme: TerminalTheme? = nil,
         defaults: UserDefaults = .standard,
         sshClient: (any SSHClientProviding)? = nil,
         credentialStore: any CredentialStoring = KeychainCredentialStore(),
@@ -90,6 +101,8 @@ final class AppState {
         self.transfers = transfers
         let storedLanguage = defaults.string(forKey: Self.languageDefaultsKey).flatMap(AppLanguage.init(rawValue:))
         self.language = language ?? storedLanguage ?? AppLanguage.default
+        let storedTheme = defaults.string(forKey: Self.terminalThemeDefaultsKey).flatMap(TerminalTheme.init(rawValue:))
+        self.terminalTheme = terminalTheme ?? storedTheme ?? TerminalTheme.default
         self.selectedTabID = tabs.first?.id
         hostKeyTrustStore.onPromptChanged = { [weak self] prompt in
             self?.pendingHostKeyPrompt = prompt

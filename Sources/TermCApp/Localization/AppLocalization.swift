@@ -49,6 +49,10 @@ struct AppStrings: Equatable, Sendable {
 
     var settings: String { self["settings"] }
     var language: String { self["language"] }
+    var terminalTheme: String { self["terminalTheme"] }
+    func terminalThemeName(_ theme: TerminalTheme) -> String {
+        self["terminalTheme.\(theme.rawValue)"]
+    }
     var newConnection: String { self["newConnection"] }
     var cancel: String { self["cancel"] }
     var ok: String { self["ok"] }
@@ -136,6 +140,11 @@ struct AppStrings: Equatable, Sendable {
         .zhHans: [
             "settings": "设置",
             "language": "语言",
+            "terminalTheme": "终端主题",
+            "terminalTheme.classicGreen": "经典黑绿",
+            "terminalTheme.amber": "琥珀",
+            "terminalTheme.paperWhite": "纸白",
+            "terminalTheme.ocean": "海洋",
             "newConnection": "新建连接",
             "cancel": "取消",
             "ok": "确定",
@@ -220,6 +229,11 @@ struct AppStrings: Equatable, Sendable {
         .en: [
             "settings": "Settings",
             "language": "Language",
+            "terminalTheme": "Terminal Theme",
+            "terminalTheme.classicGreen": "Classic Green",
+            "terminalTheme.amber": "Amber",
+            "terminalTheme.paperWhite": "Paper White",
+            "terminalTheme.ocean": "Ocean",
             "newConnection": "New Connection",
             "cancel": "Cancel",
             "ok": "OK",

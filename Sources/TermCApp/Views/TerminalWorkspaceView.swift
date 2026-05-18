@@ -5,6 +5,7 @@ struct TerminalWorkspaceView: View {
     let tabs: [TerminalTab]
     @Binding var selectedTabID: TerminalTab.ID?
     var terminalFontSize: Double = 11
+    var terminalPalette = TerminalPalette.palette(for: .classicGreen)
     var pendingCommands: [TerminalTab.ID: TerminalCommand] = [:]
     var onSelectTab: (TerminalTab.ID) -> Void = { _ in }
     var onCloseTab: (TerminalTab.ID) -> Void = { _ in }
@@ -74,6 +75,7 @@ struct TerminalWorkspaceView: View {
     private func terminalContent(for tab: TerminalTab) -> some View {
         if case .ssh(let connection, let credential) = tab.localProcess {
             LocalSSHTerminalView(connection: connection, credential: credential, fontSize: terminalFontSize)
+                .themed(terminalPalette)
                 .localized(strings)
                 .pendingCommand(pendingCommands[tab.id]) { commandID in
                     onCommandHandled(tab.id, commandID)
@@ -82,6 +84,7 @@ struct TerminalWorkspaceView: View {
             TerminalView(
                 transcript: tab.transcript,
                 fontSize: terminalFontSize,
+                palette: terminalPalette,
                 onInput: onTerminalInput
             )
         }

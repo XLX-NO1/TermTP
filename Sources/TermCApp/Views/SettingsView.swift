@@ -14,6 +14,12 @@ struct SettingsView: View {
             .onChange(of: state.language) { _, _ in
                 (NSApp.delegate as? TermTPAppDelegate)?.refreshMenuBar()
             }
+
+            Picker(state.t.terminalTheme, selection: $state.terminalTheme) {
+                ForEach(TerminalTheme.allCases) { theme in
+                    Text(state.t.terminalThemeName(theme)).tag(theme)
+                }
+            }
         }
         .formStyle(.grouped)
         .padding(20)

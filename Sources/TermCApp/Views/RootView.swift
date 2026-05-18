@@ -13,6 +13,7 @@ struct RootView: View {
                         tabs: state.tabs,
                         selectedTabID: $state.selectedTabID,
                         terminalFontSize: state.terminalFontSize,
+                        terminalPalette: state.terminalPalette,
                         pendingCommands: state.pendingTerminalCommands,
                         onSelectTab: { tabID in
                             Task {
