@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @Bindable var state: AppState
+    @State private var isCommandMenuPresented = false
     @State private var isFontSizeMenuPresented = false
 
     var body: some View {
@@ -116,23 +117,8 @@ struct RootView: View {
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
             .help(state.t.toggleSFTPDrawer)
 
-            Menu {
-                Button(state.t.listFiles) {
-                    state.sendInputToSelectedTab("ls -la\n")
-                }
-                Button(state.t.diskUsage) {
-                    state.sendInputToSelectedTab("df -h\n")
-                }
-                Button(state.t.memoryUsage) {
-                    state.sendInputToSelectedTab("free -h\n")
-                }
-                Button(state.t.processMonitor) {
-                    state.sendInputToSelectedTab("top\n")
-                }
-                Divider()
-                Button(state.t.serverStatus) {
-                    state.sendInputToSelectedTab("printf '\\n== System ==\\n'; uname -a; printf '\\n== Uptime ==\\n'; uptime; printf '\\n== Disk ==\\n'; df -h; printf '\\n== Memory ==\\n'; free -h 2>/dev/null || vm_stat\\n")
-                }
+            Button {
+                isCommandMenuPresented.toggle()
             } label: {
                 Image(systemName: "text.badge.plus")
                     .font(.system(size: 14, weight: .semibold))
@@ -144,8 +130,28 @@ struct RootView: View {
                             .stroke(Color.white.opacity(0.78), lineWidth: 1)
                     }
             }
-            .menuStyle(.borderlessButton)
+            .buttonStyle(.plain)
             .help(state.t.commandSnippets)
+            .popover(isPresented: $isCommandMenuPresented, arrowEdge: .bottom) {
+                VStack(alignment: .leading, spacing: 2) {
+                    commandMenuButton(title: state.t.listFiles, command: "ls -la\n")
+                    commandMenuButton(title: state.t.diskUsage, command: "df -h\n")
+                    commandMenuButton(title: state.t.memoryUsage, command: "free -h\n")
+                    commandMenuButton(title: state.t.processMonitor, command: "top\n")
+
+                    Rectangle()
+                        .fill(Color.white.opacity(0.12))
+                        .frame(height: 1)
+                        .padding(.vertical, 3)
+
+                    commandMenuButton(
+                        title: state.t.serverStatus,
+                        command: "printf '\\n== System ==\\n'; uname -a; printf '\\n== Uptime ==\\n'; uptime; printf '\\n== Disk ==\\n'; df -h; printf '\\n== Memory ==\\n'; free -h 2>/dev/null || vm_stat\\n"
+                    )
+                }
+                .padding(6)
+                .background(Color(red: 0.09, green: 0.10, blue: 0.11))
+            }
 
             Button {
                 isFontSizeMenuPresented.toggle()
@@ -211,6 +217,21 @@ struct RootView: View {
                 .fill(Color.white.opacity(0.08))
                 .frame(height: 1)
         }
+    }
+
+    private func commandMenuButton(title: String, command: String) -> some View {
+        Button {
+            state.sendInputToSelectedTab(command)
+            isCommandMenuPresented = false
+        } label: {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 108, height: 24, alignment: .leading)
+                .padding(.horizontal, 8)
+                .background(Color.clear, in: RoundedRectangle(cornerRadius: 5))
+        }
+        .buttonStyle(.plain)
     }
 }
 
