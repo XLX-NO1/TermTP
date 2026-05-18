@@ -4,10 +4,39 @@ import TermCCore
 @testable import TermCApp
 
 @MainActor
-@Test func terminalFontSizeOptionsOnlyIncludeVisiblyChangingSizes() {
+@Test func terminalFontSizeOptionsCoverEveryIntegerSize() {
     let state = AppState(connections: [])
 
-    #expect(state.terminalFontSizeOptions == [9, 11, 13, 15, 17])
+    #expect(state.terminalFontSizeOptions == TerminalFont.sizeOptions)
+    #expect(state.terminalFontSizeOptions == (9...18).map { $0 })
+}
+
+@Test func terminalFontMetricsChangeForEveryAdjacentSize() {
+    let sizes = Array(9...18)
+    let metrics = sizes.map { TerminalFont.cellMetrics(for: $0, scale: 2) }
+
+    for index in metrics.indices.dropLast() {
+        #expect(metrics[index] != metrics[index + 1])
+    }
+}
+
+@Test func terminalFontUsesVisiblePointSizeSteps() {
+    let sizes = Array(9...18)
+    let pointSizes = sizes.map(TerminalFont.pointSize)
+
+    #expect(pointSizes.first == 9)
+    for index in pointSizes.indices.dropLast() {
+        #expect(pointSizes[index + 1] - pointSizes[index] >= 2)
+    }
+}
+
+@Test func terminalFontUsesFixedPitchFontForEverySizeOption() {
+    for size in TerminalFont.sizeOptions {
+        let font = TerminalFont.make(size: size)
+
+        #expect(font.pointSize == TerminalFont.pointSize(for: size))
+        #expect(font.isFixedPitch)
+    }
 }
 
 @MainActor

@@ -19,7 +19,7 @@ final class AppState {
 
     var isSidebarVisible = true
     var isSFTPDrawerVisible = true
-    var terminalFontSize: Double = 11
+    var terminalFontSize = 11
     var terminalTheme: TerminalTheme {
         didSet {
             defaults.set(terminalTheme.rawValue, forKey: Self.terminalThemeDefaultsKey)
@@ -71,13 +71,12 @@ final class AppState {
         TerminalPalette.palette(for: terminalTheme)
     }
 
-    var terminalFontSizeOptions: [Double] {
-        Self.terminalFontSizeOptions
+    var terminalFontSizeOptions: [Int] {
+        TerminalFont.sizeOptions
     }
 
     private static let languageDefaultsKey = "TermTP.language"
     private static let terminalThemeDefaultsKey = "TermTP.terminalTheme"
-    private static let terminalFontSizeOptions: [Double] = [9, 11, 13, 15, 17]
     private let defaults: UserDefaults
 
     init(
@@ -290,11 +289,11 @@ final class AppState {
     }
 
     func increaseTerminalFontSize() {
-        terminalFontSize = min(18, terminalFontSize + 1)
+        terminalFontSize = min(TerminalFont.sizeOptions.last ?? terminalFontSize, terminalFontSize + 1)
     }
 
     func decreaseTerminalFontSize() {
-        terminalFontSize = max(9, terminalFontSize - 1)
+        terminalFontSize = max(TerminalFont.sizeOptions.first ?? terminalFontSize, terminalFontSize - 1)
     }
 
     func refreshRemoteFiles() async {

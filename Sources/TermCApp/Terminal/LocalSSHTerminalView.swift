@@ -6,7 +6,7 @@ import TermCCore
 struct LocalSSHTerminalView: NSViewRepresentable {
     let connection: ConnectionRecord
     let credential: Credential?
-    var fontSize: Double = 11
+    var fontSize = 11
     var palette = TerminalPalette.palette(for: .classicGreen)
     var strings = AppStrings(language: .zhHans)
     var pendingCommand: TerminalCommand?
@@ -38,7 +38,10 @@ struct LocalSSHTerminalView: NSViewRepresentable {
 
     private func configure(_ terminalView: LocalProcessTerminalView) {
         terminalView.autoresizingMask = [.width, .height]
-        terminalView.font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        let font = TerminalFont.make(size: fontSize)
+        if terminalView.font.fontName != font.fontName || terminalView.font.pointSize != font.pointSize {
+            terminalView.font = font
+        }
         terminalView.nativeBackgroundColor = palette.background.nsColor
         terminalView.nativeForegroundColor = palette.foreground.nsColor
         terminalView.caretColor = terminalView.nativeForegroundColor
@@ -46,6 +49,7 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         terminalView.menu = terminalContextMenu(for: terminalView, strings: strings)
         terminalView.needsDisplay = true
         terminalView.setNeedsDisplay(terminalView.bounds)
+        terminalView.displayIfNeeded()
     }
 
     private func startSSH(in terminalView: LocalProcessTerminalView, context: Context) {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @Bindable var state: AppState
+    @State private var isFontSizeMenuPresented = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -142,16 +143,61 @@ struct RootView: View {
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
             .help(state.t.commandSnippets)
 
-            Picker(state.t.fontSize, selection: $state.terminalFontSize) {
-                ForEach(state.terminalFontSizeOptions, id: \.self) { size in
-                    Text("\(Int(size))").tag(size)
+            Button {
+                isFontSizeMenuPresented.toggle()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "textformat.size")
+                        .font(.system(size: 12, weight: .semibold))
+
+                    Text("\(state.terminalFontSize)")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .frame(width: 18, alignment: .trailing)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.62))
+                }
+                .frame(width: 58, height: 22)
+                .foregroundStyle(.white)
+                .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 5))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 5)
+                        .stroke(Color.white.opacity(0.78), lineWidth: 1)
                 }
             }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .controlSize(.small)
-            .frame(width: 58)
+            .buttonStyle(.plain)
             .help(state.t.fontSize)
+            .popover(isPresented: $isFontSizeMenuPresented, arrowEdge: .bottom) {
+                VStack(spacing: 2) {
+                    ForEach(state.terminalFontSizeOptions, id: \.self) { size in
+                        Button {
+                            state.terminalFontSize = size
+                            isFontSizeMenuPresented = false
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: state.terminalFontSize == size ? "checkmark" : "")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .frame(width: 12)
+
+                                Text("\(size)")
+                                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                    .frame(width: 22, alignment: .leading)
+                            }
+                            .foregroundStyle(.white)
+                            .frame(width: 64, height: 24, alignment: .leading)
+                            .padding(.horizontal, 8)
+                            .background(
+                                state.terminalFontSize == size ? Color.white.opacity(0.14) : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 5)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(6)
+                .background(Color(red: 0.09, green: 0.10, blue: 0.11))
+            }
 
             Spacer(minLength: 0)
         }

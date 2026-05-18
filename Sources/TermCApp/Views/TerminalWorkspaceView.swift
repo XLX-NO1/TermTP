@@ -4,7 +4,7 @@ import TermCCore
 struct TerminalWorkspaceView: View {
     let tabs: [TerminalTab]
     @Binding var selectedTabID: TerminalTab.ID?
-    var terminalFontSize: Double = 11
+    var terminalFontSize = 11
     var terminalPalette = TerminalPalette.palette(for: .classicGreen)
     var pendingCommands: [TerminalTab.ID: TerminalCommand] = [:]
     var onSelectTab: (TerminalTab.ID) -> Void = { _ in }

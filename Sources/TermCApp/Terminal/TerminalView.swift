@@ -4,7 +4,7 @@ import SwiftUI
 
 struct TerminalView: NSViewRepresentable {
     var transcript: String
-    var fontSize: Double = 11
+    var fontSize = 11
     var palette = TerminalPalette.palette(for: .classicGreen)
     var onInput: (String) -> Void = { _ in }
 
@@ -15,26 +15,30 @@ struct TerminalView: NSViewRepresentable {
     func makeNSView(context: Context) -> SwiftTerm.TerminalView {
         let terminalView = SwiftTerm.TerminalView(frame: .zero)
         terminalView.terminalDelegate = context.coordinator
-        configure(terminalView)
         context.coordinator.updateTranscript(transcript, in: terminalView, configure: configure)
+        configure(terminalView)
         return terminalView
     }
 
     func updateNSView(_ terminalView: SwiftTerm.TerminalView, context: Context) {
-        configure(terminalView)
         context.coordinator.onInput = onInput
         context.coordinator.updateTranscript(transcript, in: terminalView, configure: configure)
+        configure(terminalView)
     }
 
     private func configure(_ terminalView: SwiftTerm.TerminalView) {
         terminalView.autoresizingMask = [.width, .height]
-        terminalView.font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        let font = TerminalFont.make(size: fontSize)
+        if terminalView.font.fontName != font.fontName || terminalView.font.pointSize != font.pointSize {
+            terminalView.font = font
+        }
         terminalView.nativeBackgroundColor = palette.background.nsColor
         terminalView.nativeForegroundColor = palette.foreground.nsColor
         terminalView.caretColor = terminalView.nativeForegroundColor
         terminalView.layer?.backgroundColor = palette.background.nsColor.cgColor
         terminalView.needsDisplay = true
         terminalView.setNeedsDisplay(terminalView.bounds)
+        terminalView.displayIfNeeded()
     }
 
     @MainActor
