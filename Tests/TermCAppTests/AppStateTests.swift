@@ -4,10 +4,10 @@ import TermCCore
 @testable import TermCApp
 
 @MainActor
-@Test func terminalFontSizeOptionsCoverCommonSizes() {
+@Test func terminalFontSizeOptionsOnlyIncludeVisiblyChangingSizes() {
     let state = AppState(connections: [])
 
-    #expect(state.terminalFontSizeOptions == [9, 10, 11, 12, 13, 14, 15, 16, 17, 18])
+    #expect(state.terminalFontSizeOptions == [9, 11, 13, 15, 17])
 }
 
 @MainActor

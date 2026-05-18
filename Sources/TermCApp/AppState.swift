@@ -77,7 +77,7 @@ final class AppState {
 
     private static let languageDefaultsKey = "TermTP.language"
     private static let terminalThemeDefaultsKey = "TermTP.terminalTheme"
-    private static let terminalFontSizeOptions: [Double] = Array(9...18).map(Double.init)
+    private static let terminalFontSizeOptions: [Double] = [9, 11, 13, 15, 17]
     private let defaults: UserDefaults
 
     init(
