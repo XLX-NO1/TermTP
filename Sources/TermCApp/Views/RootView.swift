@@ -137,10 +137,14 @@ struct RootView: View {
                 Image(systemName: "text.badge.plus")
                     .font(.system(size: 14, weight: .semibold))
                     .frame(width: 28, height: 22)
+                    .foregroundStyle(.white)
+                    .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 5))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 5)
+                            .stroke(Color.white.opacity(0.78), lineWidth: 1)
+                    }
             }
             .menuStyle(.borderlessButton)
-            .foregroundStyle(.white.opacity(0.86))
-            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
             .help(state.t.commandSnippets)
 
             Button {
