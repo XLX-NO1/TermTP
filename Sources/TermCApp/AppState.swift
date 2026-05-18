@@ -285,11 +285,11 @@ final class AppState {
     }
 
     func increaseTerminalFontSize() {
-        terminalFontSize = min(18, terminalFontSize + 2)
+        terminalFontSize = min(18, terminalFontSize + 1)
     }
 
     func decreaseTerminalFontSize() {
-        terminalFontSize = max(9, terminalFontSize - 2)
+        terminalFontSize = max(9, terminalFontSize - 1)
     }
 
     func refreshRemoteFiles() async {

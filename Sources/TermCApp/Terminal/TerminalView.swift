@@ -33,6 +33,8 @@ struct TerminalView: NSViewRepresentable {
         terminalView.nativeForegroundColor = palette.foreground.nsColor
         terminalView.caretColor = terminalView.nativeForegroundColor
         terminalView.layer?.backgroundColor = palette.background.nsColor.cgColor
+        terminalView.needsDisplay = true
+        terminalView.setNeedsDisplay(terminalView.bounds)
     }
 
     @MainActor

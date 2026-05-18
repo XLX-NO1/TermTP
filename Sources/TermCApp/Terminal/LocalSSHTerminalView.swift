@@ -44,6 +44,8 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         terminalView.caretColor = terminalView.nativeForegroundColor
         terminalView.layer?.backgroundColor = palette.background.nsColor.cgColor
         terminalView.menu = terminalContextMenu(for: terminalView, strings: strings)
+        terminalView.needsDisplay = true
+        terminalView.setNeedsDisplay(terminalView.bounds)
     }
 
     private func startSSH(in terminalView: LocalProcessTerminalView, context: Context) {
