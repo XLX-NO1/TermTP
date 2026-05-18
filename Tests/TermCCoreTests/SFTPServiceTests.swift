@@ -108,4 +108,27 @@ final class SFTPServiceTests: XCTestCase {
             XCTAssertEqual(error, .notFound("/var/www/missing.txt"))
         }
     }
+
+    func testPreviewTextReturnsUploadedFileNameForFakeService() async throws {
+        let service = FakeSFTPService()
+        let session = FakeSSHSession(record: .samplePassword)
+
+        try await service.upload(localPath: "/tmp/app.log", remotePath: "/var/www/app.log", session: session)
+
+        let preview = try await service.previewText(remotePath: "/var/www/app.log", byteLimit: 64, session: session)
+
+        XCTAssertTrue(preview.contains("app.log"))
+    }
+
+    func testChangePermissionsStoresModeOnFakeService() async throws {
+        let service = FakeSFTPService()
+        let session = FakeSSHSession(record: .samplePassword)
+
+        try await service.upload(localPath: "/tmp/app.sh", remotePath: "/var/www/app.sh", session: session)
+        try await service.changePermissions(remotePath: "/var/www/app.sh", permissions: 0o755, session: session)
+        let files = try await service.list(path: "/var/www", session: session)
+        let file = try XCTUnwrap(files.first { $0.name == "app.sh" })
+
+        XCTAssertEqual(file.permissions, 0o755)
+    }
 }

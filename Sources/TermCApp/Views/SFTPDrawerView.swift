@@ -1,5 +1,6 @@
 import SwiftUI
 import TermCCore
+import UniformTypeIdentifiers
 
 struct SFTPDrawerView: View {
     @Bindable var state: AppState
@@ -7,6 +8,8 @@ struct SFTPDrawerView: View {
     @State private var pathInput = ""
     @State private var namePrompt: NamePrompt?
     @State private var pendingName = ""
+    @State private var permissionsPrompt: RemoteFile?
+    @State private var pendingPermissions = ""
 
     private enum NamePrompt: Identifiable {
         case createDirectory
@@ -127,11 +130,15 @@ struct SFTPDrawerView: View {
                     }
                 }
             }
+            .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+                handleDroppedFiles(providers)
+            }
 
             Spacer(minLength: 0)
 
             if !state.visibleTransfers.isEmpty {
                 transferList
+                    .transition(.opacity)
             }
         }
         .padding(10)
@@ -182,10 +189,83 @@ struct SFTPDrawerView: View {
             .padding(20)
             .frame(width: 320)
         }
+        .sheet(item: $permissionsPrompt) { file in
+            VStack(alignment: .leading, spacing: 14) {
+                Text(state.t.changePermissions)
+                    .font(.headline)
+
+                Text(file.name)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                TextField(state.t.permissions, text: $pendingPermissions)
+                    .textFieldStyle(.roundedBorder)
+
+                HStack {
+                    Spacer()
+
+                    Button(state.t.cancel, role: .cancel) {
+                        permissionsPrompt = nil
+                    }
+
+                    Button(state.t.ok) {
+                        submitPermissionsPrompt(for: file)
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(pendingPermissions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding(20)
+            .frame(width: 320)
+        }
+        .sheet(item: Binding(
+            get: { state.filePreview },
+            set: { preview in
+                if preview == nil {
+                    state.dismissFilePreview()
+                }
+            }
+        )) { preview in
+            VStack(alignment: .leading, spacing: 12) {
+                Text(preview.file.name)
+                    .font(.headline)
+
+                ScrollView {
+                    Text(preview.text)
+                        .font(.system(size: 12, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .padding(10)
+                }
+                .frame(width: 620, height: 420)
+                .background(Color.black.opacity(0.92), in: RoundedRectangle(cornerRadius: 6))
+            }
+            .padding(20)
+        }
     }
 
     private var transferList: some View {
         VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                Text(state.t.transfers)
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white.opacity(0.78))
+
+                Spacer()
+
+                Button {
+                    state.clearFinishedTransfersForSelectedTab()
+                } label: {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white.opacity(0.68))
+                .help(state.t.clearFinishedTransfers)
+            }
+
             ForEach(state.visibleTransfers.suffix(3)) { transfer in
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
@@ -295,9 +375,19 @@ struct SFTPDrawerView: View {
                     chooseUploadFile(to: file)
                 }
             } else {
+                Button(state.t.preview) {
+                    Task {
+                        await state.previewRemoteFile(file)
+                    }
+                }
+
                 Button(state.t.download) {
                     chooseDownloadLocation(for: file)
                 }
+            }
+
+            Button(state.t.changePermissions) {
+                showPermissionsPrompt(for: file)
             }
 
             Button(state.t.rename) {
@@ -322,6 +412,11 @@ struct SFTPDrawerView: View {
         namePrompt = .rename(file)
     }
 
+    private func showPermissionsPrompt(for file: RemoteFile) {
+        pendingPermissions = file.permissions.map { String($0, radix: 8) } ?? ""
+        permissionsPrompt = file
+    }
+
     private func submitNamePrompt(_ prompt: NamePrompt) {
         let name = pendingName
         namePrompt = nil
@@ -332,6 +427,14 @@ struct SFTPDrawerView: View {
             case .rename(let file):
                 await state.renameRemoteFile(file, to: name)
             }
+        }
+    }
+
+    private func submitPermissionsPrompt(for file: RemoteFile) {
+        let mode = pendingPermissions
+        permissionsPrompt = nil
+        Task {
+            await state.changeRemoteFilePermissions(file, modeText: mode)
         }
     }
 
@@ -367,6 +470,31 @@ struct SFTPDrawerView: View {
         }
     }
 
+    private func handleDroppedFiles(_ providers: [NSItemProvider]) -> Bool {
+        var didStartUpload = false
+        for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            didStartUpload = true
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                let url: URL?
+                if let data = item as? Data {
+                    url = URL(dataRepresentation: data, relativeTo: nil)
+                } else {
+                    url = item as? URL
+                }
+
+                guard let url else {
+                    return
+                }
+
+                Task { @MainActor in
+                    await state.uploadFile(localPath: url.path)
+                }
+            }
+        }
+
+        return didStartUpload
+    }
+
     private func transferProgress(for transfer: TransferRecord) -> Double {
         guard transfer.totalBytes > 0 else {
             return transfer.state == .completed ? 1 : 0
@@ -389,10 +517,28 @@ struct SFTPDrawerView: View {
             if transfer.totalBytes > 0 {
                 let completed = ByteCountFormatter.string(fromByteCount: transfer.bytesCompleted, countStyle: .file)
                 let total = ByteCountFormatter.string(fromByteCount: transfer.totalBytes, countStyle: .file)
-                return "\(completed) / \(total)"
+                var parts = ["\(completed) / \(total)"]
+                if transfer.bytesPerSecond > 0 {
+                    parts.append(ByteCountFormatter.string(fromByteCount: Int64(transfer.bytesPerSecond), countStyle: .file) + "/s")
+                }
+                if let remaining = transfer.estimatedSecondsRemaining {
+                    parts.append(formatRemainingTime(remaining))
+                }
+                return parts.joined(separator: "  ")
             }
             return state.t.running
         }
+    }
+
+    private func formatRemainingTime(_ seconds: TimeInterval) -> String {
+        let totalSeconds = max(0, Int(seconds.rounded(.up)))
+        if totalSeconds < 60 {
+            return state.t.secondsRemaining(totalSeconds)
+        }
+
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return state.t.minutesSecondsRemaining(minutes, seconds)
     }
 }
 

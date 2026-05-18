@@ -66,4 +66,46 @@ final class ConnectionRecordTests: XCTestCase {
         XCTAssertNil(record.defaultRemotePath)
         XCTAssertNil(record.group)
     }
+
+    func testTransferRecordComputesSpeedAndRemainingTime() {
+        let transfer = TransferRecord(
+            sessionID: UUID(),
+            direction: .download,
+            localPath: "/tmp/archive.tgz",
+            remotePath: "/srv/archive.tgz",
+            bytesCompleted: 50,
+            totalBytes: 100,
+            state: .running,
+            createdAt: Date(timeIntervalSince1970: 10),
+            updatedAt: Date(timeIntervalSince1970: 20)
+        )
+
+        XCTAssertEqual(transfer.bytesPerSecond, 5)
+        XCTAssertEqual(transfer.estimatedSecondsRemaining, 10)
+    }
+
+    func testDecodingLegacyTransferRecordUsesCurrentDates() throws {
+        let json = """
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "sessionID": "22222222-2222-2222-2222-222222222222",
+          "direction": "download",
+          "localPath": "/tmp/app.log",
+          "remotePath": "/var/log/app.log",
+          "bytesCompleted": 10,
+          "totalBytes": 20,
+          "state": "running"
+        }
+        """
+
+        let transfer = try JSONDecoder.termc.decode(
+            TransferRecord.self,
+            from: Data(json.utf8)
+        )
+
+        XCTAssertEqual(transfer.bytesCompleted, 10)
+        XCTAssertEqual(transfer.totalBytes, 20)
+        XCTAssertNil(transfer.finishedAt)
+        XCTAssertLessThan(abs(transfer.createdAt.timeIntervalSinceNow), 2)
+    }
 }

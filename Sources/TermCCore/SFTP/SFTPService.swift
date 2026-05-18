@@ -18,6 +18,8 @@ public protocol SFTPServicing: Sendable {
     func makeDirectory(remotePath: String, session: SSHSessionProviding) async throws
     func delete(remotePath: String, kind: RemoteFile.Kind, session: SSHSessionProviding) async throws
     func rename(remotePath: String, to newRemotePath: String, session: SSHSessionProviding) async throws
+    func previewText(remotePath: String, byteLimit: Int, session: SSHSessionProviding) async throws -> String
+    func changePermissions(remotePath: String, permissions: UInt32, session: SSHSessionProviding) async throws
 }
 
 public actor FakeSFTPService: SFTPServicing {
@@ -87,6 +89,17 @@ public actor FakeSFTPService: SFTPServicing {
         files[newRemotePath] = file
     }
 
+    public func previewText(remotePath: String, byteLimit: Int, session: SSHSessionProviding) async throws -> String {
+        guard let file = files[remotePath], file.kind == .file else { throw SFTPServiceError.notFound(remotePath) }
+        return String("Preview: \(file.name)").prefix(byteLimit).description
+    }
+
+    public func changePermissions(remotePath: String, permissions: UInt32, session: SSHSessionProviding) async throws {
+        guard var file = files[remotePath] else { throw SFTPServiceError.notFound(remotePath) }
+        file.permissions = permissions
+        files[remotePath] = file
+    }
+
     private func parentPath(for path: String) -> String {
         let parent = URL(fileURLWithPath: path).deletingLastPathComponent().path
         return parent == "/" ? "" : parent
@@ -111,7 +124,8 @@ public struct CitadelSFTPService: SFTPServicing {
                         name: component.filename,
                         path: fullPath,
                         kind: component.attributes.permissions.map { $0 & 0o040000 != 0 ? .directory : .file } ?? .file,
-                        size: Int64(component.attributes.size ?? 0)
+                        size: Int64(component.attributes.size ?? 0),
+                        permissions: component.attributes.permissions
                     )
                 }
             }
@@ -214,6 +228,30 @@ public struct CitadelSFTPService: SFTPServicing {
         let citadelSession = try citadelSession(from: session)
         try await citadelSession.client.withSFTP { sftp in
             try await sftp.rename(at: remotePath, to: newRemotePath)
+        }
+    }
+
+    public func previewText(remotePath: String, byteLimit: Int, session: SSHSessionProviding) async throws -> String {
+        let citadelSession = try citadelSession(from: session)
+        return try await citadelSession.client.withSFTP { sftp in
+            try await sftp.withFile(filePath: remotePath, flags: .read) { file in
+                var buffer = try await file.read(from: 0, length: UInt32(max(1, byteLimit)))
+                let data = buffer.readData(length: buffer.readableBytes) ?? Data()
+                if let text = String(data: data, encoding: .utf8) {
+                    return text
+                }
+
+                return String(decoding: data, as: UTF8.self)
+            }
+        }
+    }
+
+    public func changePermissions(remotePath: String, permissions: UInt32, session: SSHSessionProviding) async throws {
+        let citadelSession = try citadelSession(from: session)
+        try await citadelSession.client.withSFTP { sftp in
+            var attributes = SFTPFileAttributes()
+            attributes.permissions = permissions
+            try await sftp.setAttributes(at: remotePath, to: attributes)
         }
     }
 

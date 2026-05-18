@@ -3,6 +3,12 @@ import TermCCore
 
 @MainActor
 final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
+    struct TrustedHostKey: Identifiable, Equatable {
+        var id: String { hostPort }
+        var hostPort: String
+        var key: String
+    }
+
     private let defaults: UserDefaults
     private let defaultsKey = "TermTP.trustedHostKeys"
     private var trustedKeys: [String: String]
@@ -21,6 +27,22 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
 
     func saveTrustedKey(_ key: String, host: String, port: UInt16) async throws {
         trustedKeys[self.key(for: host, port: port)] = key
+        defaults.set(trustedKeys, forKey: defaultsKey)
+    }
+
+    var trustedHostKeys: [TrustedHostKey] {
+        trustedKeys
+            .map { TrustedHostKey(hostPort: $0.key, key: $0.value) }
+            .sorted { $0.hostPort < $1.hostPort }
+    }
+
+    func removeTrustedKey(hostPort: String) {
+        trustedKeys[hostPort] = nil
+        defaults.set(trustedKeys, forKey: defaultsKey)
+    }
+
+    func clearTrustedKeys() {
+        trustedKeys.removeAll()
         defaults.set(trustedKeys, forKey: defaultsKey)
     }
 

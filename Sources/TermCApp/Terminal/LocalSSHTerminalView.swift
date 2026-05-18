@@ -17,7 +17,7 @@ struct LocalSSHTerminalView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> LocalProcessTerminalView {
-        let terminalView = LocalProcessTerminalView(frame: .zero)
+        let terminalView = ProtectedLocalProcessTerminalView(frame: .zero)
         configure(terminalView)
         startSSH(in: terminalView, context: context)
         return terminalView
@@ -36,6 +36,11 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         context.coordinator.sendPendingCommandIfNeeded(pendingCommand, to: terminalView)
     }
 
+    static func dismantleNSView(_ terminalView: LocalProcessTerminalView, coordinator: Coordinator) {
+        terminalView.terminate()
+        coordinator.removeAskPassScript()
+    }
+
     private func configure(_ terminalView: LocalProcessTerminalView) {
         terminalView.autoresizingMask = [.width, .height]
         let font = TerminalFont.make(size: fontSize)
@@ -47,6 +52,9 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         terminalView.caretColor = terminalView.nativeForegroundColor
         terminalView.layer?.backgroundColor = palette.background.nsColor.cgColor
         terminalView.menu = terminalContextMenu(for: terminalView, strings: strings)
+        if let protectedTerminalView = terminalView as? ProtectedLocalProcessTerminalView {
+            protectedTerminalView.strings = strings
+        }
         terminalView.needsDisplay = true
         terminalView.setNeedsDisplay(terminalView.bounds)
         terminalView.displayIfNeeded()
@@ -79,6 +87,15 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         }
 
         return !password.isEmpty
+    }
+
+    nonisolated static func needsMultilinePasteConfirmation(_ text: String) -> Bool {
+        let normalizedLines = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .split(separator: "\n", omittingEmptySubsequences: true)
+
+        return normalizedLines.count > 1
     }
 
     struct LaunchConfiguration {
@@ -261,6 +278,31 @@ struct LocalSSHTerminalView: NSViewRepresentable {
             terminalView.process.send(data: bytes[...])
             onCommandHandled(command.id)
         }
+    }
+}
+
+final class ProtectedLocalProcessTerminalView: LocalProcessTerminalView {
+    var strings = AppStrings(language: .zhHans)
+
+    override func paste(_ sender: Any) {
+        let clipboard = NSPasteboard.general
+        let text = clipboard.string(forType: .string) ?? ""
+        guard LocalSSHTerminalView.needsMultilinePasteConfirmation(text) else {
+            super.paste(sender)
+            return
+        }
+
+        let alert = NSAlert()
+        alert.messageText = strings.confirmMultilinePasteTitle
+        alert.informativeText = strings.confirmMultilinePasteMessage
+        alert.addButton(withTitle: strings.paste)
+        alert.addButton(withTitle: strings.cancel)
+
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            return
+        }
+
+        super.paste(sender)
     }
 }
 

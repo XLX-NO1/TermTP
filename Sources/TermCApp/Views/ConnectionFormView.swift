@@ -1,5 +1,6 @@
 import SwiftUI
 import TermCCore
+import UniformTypeIdentifiers
 
 struct ConnectionFormView: View {
     @Bindable var state: AppState
@@ -44,7 +45,17 @@ struct ConnectionFormView: View {
                 Toggle(state.t.usePrivateKey, isOn: $state.draftUsesKey)
 
                 if state.draftUsesKey {
-                    TextField(state.t.privateKeyPath, text: $state.draftPrivateKeyPath)
+                    HStack(spacing: 8) {
+                        TextField(state.t.privateKeyPath, text: $state.draftPrivateKeyPath)
+
+                        Button {
+                            choosePrivateKey()
+                        } label: {
+                            Image(systemName: "folder")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(state.t.choosePrivateKey)
+                    }
                     SecureField(state.t.privateKeyPassphrase, text: $state.draftPrivateKeyPassphrase)
                 } else {
                     SecureField(state.t.password, text: $state.draftPassword)
@@ -103,6 +114,21 @@ struct ConnectionFormView: View {
         }
         .padding(24)
         .frame(width: 420)
+    }
+
+    private func choosePrivateKey() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.item]
+        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".ssh", isDirectory: true)
+
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return
+        }
+
+        state.draftPrivateKeyPath = url.path
     }
 }
 

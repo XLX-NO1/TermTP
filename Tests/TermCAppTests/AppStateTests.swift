@@ -366,6 +366,24 @@ import TermCCore
 }
 
 @MainActor
+@Test func closeTabDisconnectsClosedSession() async {
+    let first = TerminalTab(title: "First", state: .connected, transcript: "")
+    let session = DisconnectRecordingSession(record: ConnectionRecord(
+        alias: "Second",
+        host: "second.example.com",
+        username: "deploy",
+        authentication: .password
+    ))
+    let second = TerminalTab(title: "Second", state: .connected, transcript: "", session: session)
+    let state = AppState(tabs: [first, second], connections: [])
+    state.selectedTabID = second.id
+
+    await state.closeTab(second.id)
+
+    #expect(await session.didDisconnect)
+}
+
+@MainActor
 @Test func closingSelectedTabRefreshesNeighborRemoteFiles() async {
     let firstSession = FakeSSHSession(record: .samplePassword)
     let secondSession = FakeSSHSession(record: ConnectionRecord(
@@ -623,6 +641,88 @@ import TermCCore
 }
 
 @MainActor
+@Test func retryFailedDownloadUsesOriginalTransferSessionWhenAnotherTabIsSelected() async throws {
+    let firstRecord = ConnectionRecord(
+        alias: "First",
+        host: "first.example.com",
+        username: "deploy",
+        authentication: .password
+    )
+    let secondRecord = ConnectionRecord(
+        alias: "Second",
+        host: "second.example.com",
+        username: "deploy",
+        authentication: .password
+    )
+    let firstSession = FakeSSHSession(record: firstRecord)
+    let secondSession = FakeSSHSession(record: secondRecord)
+    let first = TerminalTab(title: "First", state: .connected, transcript: "", session: firstSession)
+    let second = TerminalTab(title: "Second", state: .connected, transcript: "", session: secondSession)
+    let transfer = TransferRecord(
+        sessionID: first.id,
+        direction: .download,
+        localPath: "/tmp/retry.log",
+        remotePath: "/var/log/retry.log",
+        state: .failed,
+        errorMessage: "Network lost"
+    )
+    let service = SessionRecordingSFTPService()
+    let state = AppState(
+        tabs: [first, second],
+        connections: [],
+        transfers: [transfer],
+        sftpService: service
+    )
+    state.selectedTabID = second.id
+
+    await state.retryTransfer(transfer.id)
+
+    #expect(await service.downloadHosts == ["first.example.com"])
+    #expect(state.transfers.first?.state == .completed)
+}
+
+@MainActor
+@Test func retryFailedUploadUsesOriginalTransferSessionWhenAnotherTabIsSelected() async throws {
+    let firstRecord = ConnectionRecord(
+        alias: "First",
+        host: "first.example.com",
+        username: "deploy",
+        authentication: .password
+    )
+    let secondRecord = ConnectionRecord(
+        alias: "Second",
+        host: "second.example.com",
+        username: "deploy",
+        authentication: .password
+    )
+    let firstSession = FakeSSHSession(record: firstRecord)
+    let secondSession = FakeSSHSession(record: secondRecord)
+    let first = TerminalTab(title: "First", state: .connected, transcript: "", session: firstSession)
+    let second = TerminalTab(title: "Second", state: .connected, transcript: "", session: secondSession)
+    let transfer = TransferRecord(
+        sessionID: first.id,
+        direction: .upload,
+        localPath: "/tmp/retry.log",
+        remotePath: "/var/log/retry.log",
+        state: .failed,
+        errorMessage: "Network lost"
+    )
+    let service = SessionRecordingSFTPService()
+    let state = AppState(
+        tabs: [first, second],
+        connections: [],
+        transfers: [transfer],
+        sftpService: service
+    )
+    state.selectedTabID = second.id
+
+    await state.retryTransfer(transfer.id)
+
+    #expect(await service.uploadHosts == ["first.example.com"])
+    #expect(state.transfers.first?.state == .completed)
+}
+
+@MainActor
 @Test func uploadAndDownloadCreateCompletedTransfers() async {
     let state = AppState(
         tabs: [TerminalTab(
@@ -677,13 +777,67 @@ import TermCCore
                 direction: .upload,
                 localPath: "/tmp/done.bin",
                 remotePath: "/done.bin",
-                state: .completed
+                state: .completed,
+                finishedAt: Date(timeIntervalSinceNow: -10)
             )
         ]
     )
     state.selectedTabID = first.id
 
     #expect(state.visibleTransfers.map(\.remotePath) == ["/first.bin"])
+}
+
+@MainActor
+@Test func visibleTransfersKeepsRecentlyCompletedTransfersAndHidesOldCompletedTransfers() {
+    let tab = TerminalTab(title: "First", state: .connected, transcript: "")
+    let recent = TransferRecord(
+        sessionID: tab.id,
+        direction: .download,
+        localPath: "/tmp/recent.bin",
+        remotePath: "/recent.bin",
+        state: .completed,
+        finishedAt: Date()
+    )
+    let old = TransferRecord(
+        sessionID: tab.id,
+        direction: .download,
+        localPath: "/tmp/old.bin",
+        remotePath: "/old.bin",
+        state: .completed,
+        finishedAt: Date(timeIntervalSinceNow: -10)
+    )
+    let failed = TransferRecord(
+        sessionID: tab.id,
+        direction: .download,
+        localPath: "/tmp/failed.bin",
+        remotePath: "/failed.bin",
+        state: .failed
+    )
+    let state = AppState(tabs: [tab], connections: [], transfers: [recent, old, failed])
+    state.selectedTabID = tab.id
+
+    #expect(state.visibleTransfers.map(\.remotePath) == ["/recent.bin", "/failed.bin"])
+}
+
+@MainActor
+@Test func clearFinishedTransfersRemovesCompletedAndCancelledTransfersForSelectedTab() {
+    let first = TerminalTab(title: "First", state: .connected, transcript: "")
+    let second = TerminalTab(title: "Second", state: .connected, transcript: "")
+    let state = AppState(
+        tabs: [first, second],
+        connections: [],
+        transfers: [
+            TransferRecord(sessionID: first.id, direction: .download, localPath: "/tmp/done.bin", remotePath: "/done.bin", state: .completed),
+            TransferRecord(sessionID: first.id, direction: .download, localPath: "/tmp/cancelled.bin", remotePath: "/cancelled.bin", state: .cancelled),
+            TransferRecord(sessionID: first.id, direction: .download, localPath: "/tmp/failed.bin", remotePath: "/failed.bin", state: .failed),
+            TransferRecord(sessionID: second.id, direction: .download, localPath: "/tmp/other.bin", remotePath: "/other.bin", state: .completed)
+        ]
+    )
+    state.selectedTabID = first.id
+
+    state.clearFinishedTransfersForSelectedTab()
+
+    #expect(state.transfers.map(\.remotePath) == ["/failed.bin", "/other.bin"])
 }
 
 @MainActor
@@ -736,6 +890,23 @@ import TermCCore
     #expect(files == [
         RemoteFile(name: "site.conf", path: "/var/www/logs/site.conf", kind: .file, size: 1)
     ])
+}
+
+@MainActor
+@Test func uploadFileToRootDirectoryUsesSingleLeadingSlash() async {
+    let session = FakeSSHSession(record: .samplePassword)
+    let service = FakeSFTPService()
+    let state = AppState(
+        tabs: [TerminalTab(title: "Connected", state: .connected, transcript: "", remotePath: "/", session: session)],
+        connections: [],
+        sftpService: service
+    )
+    state.selectedTabID = state.tabs[0].id
+    state.remotePath = "/"
+
+    await state.uploadFile(localPath: "/tmp/site.conf")
+
+    #expect(state.transfers.first?.remotePath == "/site.conf")
 }
 
 @MainActor
@@ -870,6 +1041,30 @@ private actor UnsupportedSFTPSession: SSHSessionProviding {
     func disconnect() async throws {}
 }
 
+private actor DisconnectRecordingSession: SSHSessionProviding {
+    let id = UUID()
+    let record: ConnectionRecord
+    private var currentState: SSHSessionState = .connected
+    private(set) var didDisconnect = false
+
+    init(record: ConnectionRecord) {
+        self.record = record
+    }
+
+    var state: SSHSessionState {
+        currentState
+    }
+
+    func send(_ input: String) async throws {}
+
+    func drainOutput() async -> String { "" }
+
+    func disconnect() async throws {
+        didDisconnect = true
+        currentState = .disconnected
+    }
+}
+
 private actor RecordingSFTPService: SFTPServicing {
     private let filesByPath: [String: [RemoteFile]]
     private(set) var listedPaths: [String] = []
@@ -900,6 +1095,46 @@ private actor RecordingSFTPService: SFTPServicing {
     func delete(remotePath: String, kind: RemoteFile.Kind, session: SSHSessionProviding) async throws {}
 
     func rename(remotePath: String, to newRemotePath: String, session: SSHSessionProviding) async throws {}
+
+    func previewText(remotePath: String, byteLimit: Int, session: SSHSessionProviding) async throws -> String { "" }
+
+    func changePermissions(remotePath: String, permissions: UInt32, session: SSHSessionProviding) async throws {}
+}
+
+private actor SessionRecordingSFTPService: SFTPServicing {
+    private(set) var uploadHosts: [String] = []
+    private(set) var downloadHosts: [String] = []
+
+    func list(path: String, session: SSHSessionProviding) async throws -> [RemoteFile] { [] }
+
+    func upload(localPath: String, remotePath: String, session: SSHSessionProviding) async throws {
+        uploadHosts.append(session.record.host)
+    }
+
+    func download(remotePath: String, localPath: String, session: SSHSessionProviding) async throws {
+        downloadHosts.append(session.record.host)
+    }
+
+    func download(
+        remotePath: String,
+        localPath: String,
+        resumeFrom offset: Int64,
+        progress: @escaping ProgressHandler,
+        session: SSHSessionProviding
+    ) async throws {
+        downloadHosts.append(session.record.host)
+        await progress(1, 1)
+    }
+
+    func makeDirectory(remotePath: String, session: SSHSessionProviding) async throws {}
+
+    func delete(remotePath: String, kind: RemoteFile.Kind, session: SSHSessionProviding) async throws {}
+
+    func rename(remotePath: String, to newRemotePath: String, session: SSHSessionProviding) async throws {}
+
+    func previewText(remotePath: String, byteLimit: Int, session: SSHSessionProviding) async throws -> String { "" }
+
+    func changePermissions(remotePath: String, permissions: UInt32, session: SSHSessionProviding) async throws {}
 }
 
 private actor SlowMutationSFTPService: SFTPServicing {
@@ -963,6 +1198,10 @@ private actor SlowMutationSFTPService: SFTPServicing {
     func delete(remotePath: String, kind: RemoteFile.Kind, session: SSHSessionProviding) async throws {}
 
     func rename(remotePath: String, to newRemotePath: String, session: SSHSessionProviding) async throws {}
+
+    func previewText(remotePath: String, byteLimit: Int, session: SSHSessionProviding) async throws -> String { "" }
+
+    func changePermissions(remotePath: String, permissions: UInt32, session: SSHSessionProviding) async throws {}
 }
 
 private actor ProgressRecordingSFTPService: SFTPServicing {
@@ -994,6 +1233,10 @@ private actor ProgressRecordingSFTPService: SFTPServicing {
     func delete(remotePath: String, kind: RemoteFile.Kind, session: SSHSessionProviding) async throws {}
 
     func rename(remotePath: String, to newRemotePath: String, session: SSHSessionProviding) async throws {}
+
+    func previewText(remotePath: String, byteLimit: Int, session: SSHSessionProviding) async throws -> String { "" }
+
+    func changePermissions(remotePath: String, permissions: UInt32, session: SSHSessionProviding) async throws {}
 }
 
 private actor RetrySFTPService: SFTPServicing {
@@ -1024,6 +1267,10 @@ private actor RetrySFTPService: SFTPServicing {
     func delete(remotePath: String, kind: RemoteFile.Kind, session: SSHSessionProviding) async throws {}
 
     func rename(remotePath: String, to newRemotePath: String, session: SSHSessionProviding) async throws {}
+
+    func previewText(remotePath: String, byteLimit: Int, session: SSHSessionProviding) async throws -> String { "" }
+
+    func changePermissions(remotePath: String, permissions: UInt32, session: SSHSessionProviding) async throws {}
 }
 
 @Test func welcomeTabUsesChineseTermTPBrandName() {

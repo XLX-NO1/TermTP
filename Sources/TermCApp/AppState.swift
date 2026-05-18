@@ -62,6 +62,8 @@ final class AppState {
     var pendingHostKeyPrompt: HostKeyPrompt?
     var remotePath = "."
     var remoteFiles: [RemoteFile] = []
+    var filePreview: RemoteFilePreview?
+    private var trustedHostKeyRevision = 0
 
     var t: AppStrings {
         AppStrings(language: language)
@@ -73,6 +75,11 @@ final class AppState {
 
     var terminalFontSizeOptions: [Int] {
         TerminalFont.sizeOptions
+    }
+
+    var trustedHostKeys: [AppHostKeyTrustStore.TrustedHostKey] {
+        _ = trustedHostKeyRevision
+        return hostKeyTrustStore.trustedHostKeys
     }
 
     private static let languageDefaultsKey = "TermTP.language"
@@ -150,8 +157,20 @@ final class AppState {
             return []
         }
 
+        let recentCompletionCutoff = Date().addingTimeInterval(-4)
         return transfers.filter {
-            $0.sessionID == selectedTabID && $0.state != .completed
+            guard $0.sessionID == selectedTabID else {
+                return false
+            }
+
+            switch $0.state {
+            case .completed:
+                return ($0.finishedAt ?? $0.updatedAt) >= recentCompletionCutoff
+            case .cancelled:
+                return false
+            case .queued, .running, .failed:
+                return true
+            }
         }
     }
 
@@ -161,6 +180,16 @@ final class AppState {
 
     func rejectPendingHostKey() {
         hostKeyTrustStore.resolvePendingPrompt(trusted: false)
+    }
+
+    func removeTrustedHostKey(hostPort: String) {
+        hostKeyTrustStore.removeTrustedKey(hostPort: hostPort)
+        trustedHostKeyRevision += 1
+    }
+
+    func clearTrustedHostKeys() {
+        hostKeyTrustStore.clearTrustedKeys()
+        trustedHostKeyRevision += 1
     }
 
     func showNotification(kind: AppNotification.Kind, message: String) {
@@ -176,6 +205,7 @@ final class AppState {
             return
         }
 
+        let closedTab = tabs[index]
         tabs.remove(at: index)
         if selectedTabID == id {
             let nextIndex = min(index, tabs.count - 1)
@@ -183,6 +213,8 @@ final class AppState {
             remotePath = tabs[nextIndex].remotePath
             await refreshRemoteFiles()
         }
+
+        try? await closedTab.session?.disconnect()
     }
 
     func selectTab(_ id: TerminalTab.ID) async {
@@ -444,6 +476,50 @@ final class AppState {
         }
     }
 
+    func previewRemoteFile(_ file: RemoteFile) async {
+        guard file.kind == .file, let context = selectedSFTPContext else {
+            return
+        }
+
+        do {
+            let text = try await sftpService.previewText(
+                remotePath: file.path,
+                byteLimit: 64 * 1024,
+                session: context.session
+            )
+            filePreview = RemoteFilePreview(file: file, text: text)
+        } catch {
+            showNotification(kind: .error, message: t.previewFailed(String(describing: error)))
+        }
+    }
+
+    func dismissFilePreview() {
+        filePreview = nil
+    }
+
+    func changeRemoteFilePermissions(_ file: RemoteFile, modeText: String) async {
+        saveRemotePathForSelectedTab()
+        guard let context = selectedSFTPContext else {
+            return
+        }
+
+        let trimmedMode = modeText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            !trimmedMode.isEmpty,
+            let mode = UInt32(trimmedMode, radix: 8)
+        else {
+            showNotification(kind: .error, message: t.invalidPermissions)
+            return
+        }
+
+        do {
+            try await sftpService.changePermissions(remotePath: file.path, permissions: mode, session: context.session)
+            await refreshRemoteFiles(tabID: context.tabID, path: context.path, session: context.session)
+        } catch {
+            showNotification(kind: .error, message: t.permissionsChangeFailed(String(describing: error)))
+        }
+    }
+
     private func uploadFile(localPath: String, remoteDirectoryPath: String) async {
         guard let context = selectedSFTPContext else {
             recordFailedTransfer(
@@ -455,7 +531,10 @@ final class AppState {
             return
         }
 
-        let remoteFilePath = "\(remoteDirectoryPath)/\(URL(fileURLWithPath: localPath).lastPathComponent)"
+        let remoteFilePath = joinedRemotePath(
+            directory: remoteDirectoryPath,
+            name: URL(fileURLWithPath: localPath).lastPathComponent
+        )
         let transfer = appendTransfer(
             direction: .upload,
             localPath: localPath,
@@ -464,20 +543,34 @@ final class AppState {
         )
 
         await runTrackedTransfer(transfer.id) {
-            await self.runUploadTransfer(transfer.id, localPath: localPath, remotePath: remoteFilePath)
+            await self.runUploadTransfer(
+                transfer.id,
+                localPath: localPath,
+                remotePath: remoteFilePath,
+                context: context
+            )
         }
     }
 
     private func joinedRemotePath(directory: String, name: String) -> String {
-        if directory == "/" {
+        let trimmedDirectory = directory.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedDirectory.isEmpty || trimmedDirectory == "." {
+            return name
+        }
+
+        if trimmedDirectory == "/" {
             return "/\(name)"
         }
 
-        return "\(directory)/\(name)"
+        var normalizedDirectory = trimmedDirectory
+        while normalizedDirectory.hasSuffix("/") {
+            normalizedDirectory.removeLast()
+        }
+        return "\(normalizedDirectory)/\(name)"
     }
 
     func downloadFile(remoteFile: RemoteFile, localPath: String) async {
-        guard selectedSession != nil else {
+        guard let context = selectedSFTPContext else {
             recordFailedTransfer(
                 direction: .download,
                 localPath: localPath,
@@ -492,6 +585,7 @@ final class AppState {
             direction: .download,
             localPath: localPath,
             remotePath: remoteFile.path,
+            sessionID: context.tabID,
             bytesCompleted: resumeOffset,
             totalBytes: remoteFile.size
         )
@@ -501,7 +595,8 @@ final class AppState {
                 transfer.id,
                 remotePath: remoteFile.path,
                 localPath: localPath,
-                totalBytes: remoteFile.size
+                totalBytes: remoteFile.size,
+                session: context.session
             )
         }
     }
@@ -518,6 +613,18 @@ final class AppState {
         transferTasks[id]?.cancel()
         transferTasks[id] = nil
         transfers[index].state = .cancelled
+        transfers[index].updatedAt = Date()
+        transfers[index].finishedAt = Date()
+    }
+
+    func clearFinishedTransfersForSelectedTab() {
+        guard let selectedTabID else {
+            return
+        }
+
+        transfers.removeAll {
+            $0.sessionID == selectedTabID && ($0.state == .completed || $0.state == .cancelled)
+        }
     }
 
     func retryTransfer(_ id: TransferRecord.ID) async {
@@ -533,15 +640,34 @@ final class AppState {
         transfers[index].state = .running
         transfers[index].errorMessage = nil
         transfers[index].bytesCompleted = 0
+        transfers[index].createdAt = Date()
+        transfers[index].updatedAt = transfers[index].createdAt
+        transfers[index].finishedAt = nil
+
+        guard let context = sftpContext(for: transfer.sessionID) else {
+            failTransfer(id, message: t.noActiveSSHSession)
+            return
+        }
 
         switch transfer.direction {
         case .download:
             await runTrackedTransfer(id) {
-                await self.runDownloadTransfer(id, remotePath: transfer.remotePath, localPath: transfer.localPath, totalBytes: transfer.totalBytes)
+                await self.runDownloadTransfer(
+                    id,
+                    remotePath: transfer.remotePath,
+                    localPath: transfer.localPath,
+                    totalBytes: transfer.totalBytes,
+                    session: context.session
+                )
             }
         case .upload:
             await runTrackedTransfer(id) {
-                await self.runUploadTransfer(id, localPath: transfer.localPath, remotePath: transfer.remotePath)
+                await self.runUploadTransfer(
+                    id,
+                    localPath: transfer.localPath,
+                    remotePath: transfer.remotePath,
+                    context: context
+                )
             }
         }
     }
@@ -841,14 +967,23 @@ final class AppState {
 
     private var selectedSFTPContext: SFTPContext? {
         guard
-            let selectedTabID,
-            let tab = tabs.first(where: { $0.id == selectedTabID }),
+            let selectedTabID
+        else {
+            return nil
+        }
+
+        return sftpContext(for: selectedTabID)
+    }
+
+    private func sftpContext(for tabID: TerminalTab.ID) -> SFTPContext? {
+        guard
+            let tab = tabs.first(where: { $0.id == tabID }),
             let session = tab.session
         else {
             return nil
         }
 
-        return SFTPContext(tabID: selectedTabID, path: tab.remotePath, session: session)
+        return SFTPContext(tabID: tabID, path: tab.remotePath, session: session)
     }
 
     private func attachSession(_ session: SSHSessionProviding, to id: TerminalTab.ID) {
@@ -928,13 +1063,9 @@ final class AppState {
     private func runUploadTransfer(
         _ id: TransferRecord.ID,
         localPath: String,
-        remotePath: String
+        remotePath: String,
+        context: SFTPContext
     ) async {
-        guard let context = selectedSFTPContext else {
-            failTransfer(id, message: t.noActiveSSHSession)
-            return
-        }
-
         do {
             try Task.checkCancellation()
             try await sftpService.upload(localPath: localPath, remotePath: remotePath, session: context.session)
@@ -952,13 +1083,9 @@ final class AppState {
         _ id: TransferRecord.ID,
         remotePath: String,
         localPath: String,
-        totalBytes: Int64
+        totalBytes: Int64,
+        session: SSHSessionProviding
     ) async {
-        guard let session = selectedSession else {
-            failTransfer(id, message: t.noActiveSSHSession)
-            return
-        }
-
         let resumeOffset = localFileSize(at: localPath)
         updateTransferProgress(id, bytesCompleted: resumeOffset, totalBytes: totalBytes)
 
@@ -1013,6 +1140,8 @@ final class AppState {
 
         transfers[index].bytesCompleted = max(transfers[index].bytesCompleted, transfers[index].totalBytes)
         transfers[index].state = .completed
+        transfers[index].updatedAt = Date()
+        transfers[index].finishedAt = transfers[index].updatedAt
     }
 
     private func updateTransferProgress(
@@ -1029,6 +1158,7 @@ final class AppState {
 
         transfers[index].bytesCompleted = bytesCompleted
         transfers[index].totalBytes = totalBytes
+        transfers[index].updatedAt = Date()
     }
 
     private func failTransfer(_ id: TransferRecord.ID, message: String) {
@@ -1041,6 +1171,8 @@ final class AppState {
 
         transfers[index].state = .failed
         transfers[index].errorMessage = message
+        transfers[index].updatedAt = Date()
+        transfers[index].finishedAt = nil
     }
 
     private func localFileSize(at path: String) -> Int64 {

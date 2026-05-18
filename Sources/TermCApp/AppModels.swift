@@ -63,6 +63,12 @@ struct TerminalCommand: Identifiable, Equatable {
     var text: String
 }
 
+struct RemoteFilePreview: Identifiable, Equatable {
+    var id = UUID()
+    var file: RemoteFile
+    var text: String
+}
+
 enum TerminalLocalProcess: Equatable {
     case ssh(ConnectionRecord, credential: Credential?)
 }

@@ -95,3 +95,11 @@ import TermCCore
     #expect(launch.args.contains("-D"))
     #expect(launch.args.contains("127.0.0.1:1080"))
 }
+
+@Test func pasteConfirmationOnlyTriggersForMultipleLogicalLines() {
+    #expect(!LocalSSHTerminalView.needsMultilinePasteConfirmation(""))
+    #expect(!LocalSSHTerminalView.needsMultilinePasteConfirmation("ls -la"))
+    #expect(!LocalSSHTerminalView.needsMultilinePasteConfirmation("ls -la\n"))
+    #expect(LocalSSHTerminalView.needsMultilinePasteConfirmation("cd /tmp\nrm -rf test\n"))
+    #expect(LocalSSHTerminalView.needsMultilinePasteConfirmation("cd /tmp\rrm -rf test"))
+}
