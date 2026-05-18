@@ -4,16 +4,20 @@ import TermCCore
 @testable import TermCApp
 
 @MainActor
-@Test func terminalFontButtonsChangeSizeOnePointAtATime() {
+@Test func terminalFontButtonsJumpBetweenVisibleSizeSteps() {
     let state = AppState(connections: [])
 
     state.increaseTerminalFontSize()
 
     #expect(state.terminalFontSize == 12)
 
+    state.increaseTerminalFontSize()
+
+    #expect(state.terminalFontSize == 13)
+
     state.decreaseTerminalFontSize()
 
-    #expect(state.terminalFontSize == 11)
+    #expect(state.terminalFontSize == 12)
 }
 
 @MainActor
