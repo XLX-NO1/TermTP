@@ -35,6 +35,7 @@ struct ConnectionFormView: View {
 
             Form {
                 TextField(state.t.alias, text: $state.draftAlias)
+                TextField(state.t.group, text: $state.draftGroup)
                 TextField(state.t.host, text: $state.draftHost)
                 TextField(state.t.port, text: $state.draftPort)
                 TextField(state.t.username, text: $state.draftUsername)

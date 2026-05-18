@@ -26,6 +26,19 @@ import Testing
     #expect(AppStrings(language: .en).settings == "Settings")
 }
 
+@Test func allLocalizedDictionariesHaveRequiredKnownNonEmptyKeys() {
+    for language in AppLanguage.allCases {
+        let keys = AppStrings.keys(for: language)
+
+        #expect(keys.isSubset(of: AppStrings.requiredKeys))
+        #expect(keys == AppStrings.requiredKeys)
+
+        for key in keys {
+            #expect(!AppStrings.rawValue(for: key, language: language).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+}
+
 @MainActor
 @Test func appStateLanguageCanBeChanged() {
     let state = AppState(connections: [], language: .zhHans)

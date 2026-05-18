@@ -11,6 +11,7 @@ final class ConnectionRecordTests: XCTestCase {
             username: "deploy",
             authentication: .publicKey(privateKeyPath: "/Users/me/.ssh/id_ed25519"),
             tags: ["prod", "api"],
+            group: "Production",
             isFavorite: true,
             defaultRemotePath: "/var/www",
             lastConnectedAt: Date(timeIntervalSince1970: 100),
@@ -63,5 +64,6 @@ final class ConnectionRecordTests: XCTestCase {
         XCTAssertNil(record.jumpHost)
         XCTAssertTrue(record.portForwards.isEmpty)
         XCTAssertNil(record.defaultRemotePath)
+        XCTAssertNil(record.group)
     }
 }

@@ -12,10 +12,11 @@ struct ConnectionSidebarView: View {
         }
 
         return state.connections.filter { connection in
-            connection.alias.localizedCaseInsensitiveContains(searchText)
-                || connection.host.localizedCaseInsensitiveContains(searchText)
-                || connection.username.localizedCaseInsensitiveContains(searchText)
-                || connection.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
+                connection.alias.localizedCaseInsensitiveContains(searchText)
+                    || connection.host.localizedCaseInsensitiveContains(searchText)
+                    || connection.username.localizedCaseInsensitiveContains(searchText)
+                    || (connection.group?.localizedCaseInsensitiveContains(searchText) ?? false)
+                    || connection.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
         }
     }
 
@@ -58,6 +59,14 @@ struct ConnectionSidebarView: View {
                     connectionSection(
                         "#\(tag)",
                         connections: state.connections.filter { $0.tags.contains(tag) },
+                        isHistory: false
+                    )
+                }
+
+                ForEach(state.connectionGroups, id: \.self) { group in
+                    connectionSection(
+                        group,
+                        connections: state.connections.filter { $0.group == group },
                         isHistory: false
                     )
                 }
@@ -177,7 +186,7 @@ struct ConnectionSidebarView: View {
                 let data = try Data(contentsOf: url)
                 try await state.importConnections(from: data)
             } catch {
-                NSSound.beep()
+                state.showNotification(kind: .error, message: state.t.importConnectionsFailed(String(describing: error)))
             }
         }
     }
@@ -195,7 +204,7 @@ struct ConnectionSidebarView: View {
             let data = try state.exportConnections()
             try data.write(to: url, options: .atomic)
         } catch {
-            NSSound.beep()
+            state.showNotification(kind: .error, message: state.t.exportConnectionsFailed(String(describing: error)))
         }
     }
 }
@@ -220,6 +229,13 @@ private struct ConnectionRow: View {
                 Text(connection.tags.map { "#\($0)" }.joined(separator: " "))
                     .font(.caption2)
                     .foregroundStyle(Color.green.opacity(0.72))
+                    .lineLimit(1)
+            }
+
+            if let group = connection.group, !group.isEmpty {
+                Text(group)
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.58))
                     .lineLimit(1)
             }
         }

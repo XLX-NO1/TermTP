@@ -202,13 +202,50 @@ struct SFTPDrawerView: View {
                         Text(transferLabel(for: transfer))
                             .font(.caption2)
                             .foregroundStyle(.white.opacity(0.68))
+
+                        transferActions(for: transfer)
                     }
 
                     ProgressView(value: transferProgress(for: transfer))
                         .progressViewStyle(.linear)
                         .controlSize(.small)
+
+                    if transfer.state == .failed, let errorMessage = transfer.errorMessage {
+                        Text(errorMessage)
+                            .font(.caption2)
+                            .foregroundStyle(.red.opacity(0.82))
+                            .lineLimit(2)
+                    }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func transferActions(for transfer: TransferRecord) -> some View {
+        switch transfer.state {
+        case .running, .queued:
+            Button {
+                state.cancelTransfer(transfer.id)
+            } label: {
+                Image(systemName: "xmark.circle")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white.opacity(0.74))
+            .help(state.t.cancel)
+        case .failed, .cancelled:
+            Button {
+                Task {
+                    await state.retryTransfer(transfer.id)
+                }
+            } label: {
+                Image(systemName: "arrow.clockwise.circle")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white.opacity(0.74))
+            .help(state.t.retry)
+        case .completed:
+            EmptyView()
         }
     }
 

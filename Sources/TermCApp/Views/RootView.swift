@@ -48,6 +48,16 @@ struct RootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(red: 0.08, green: 0.09, blue: 0.10))
+        .overlay(alignment: .topTrailing) {
+            if let notification = state.notification {
+                NotificationBanner(notification: notification) {
+                    state.dismissNotification()
+                }
+                .padding(.top, 36)
+                .padding(.trailing, 12)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
         .sheet(isPresented: $state.isConnectionFormPresented) {
             ConnectionFormView(state: state)
         }
@@ -167,6 +177,53 @@ struct RootView: View {
                 .fill(Color.white.opacity(0.08))
                 .frame(height: 1)
         }
+    }
+}
+
+private struct NotificationBanner: View {
+    let notification: AppNotification
+    let onDismiss: () -> Void
+
+    private var color: Color {
+        switch notification.kind {
+        case .info:
+            return .blue
+        case .warning:
+            return .yellow
+        case .error:
+            return .red
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(color)
+                .frame(width: 7, height: 7)
+
+            Text(notification.message)
+                .font(.caption)
+                .foregroundStyle(.white)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .semibold))
+                    .frame(width: 18, height: 18)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white.opacity(0.78))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: 320, alignment: .leading)
+        .background(Color.black.opacity(0.84), in: RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.28), radius: 12, y: 6)
     }
 }
 

@@ -33,10 +33,13 @@ final class AppState {
     var selectedTabID: TerminalTab.ID?
     var tabs: [TerminalTab]
     var pendingTerminalCommands: [TerminalTab.ID: TerminalCommand] = [:]
+    private var transferTasks: [TransferRecord.ID: Task<Void, Never>] = [:]
     var connections: [ConnectionRecord]
     var transfers: [TransferRecord]
+    var notification: AppNotification?
     var isConnectionFormPresented = false
     var draftAlias = ""
+    var draftGroup = ""
     var draftHost = ""
     var draftPort = "22"
     var draftUsername = ""
@@ -131,6 +134,13 @@ final class AppState {
         Array(Set(connections.flatMap(\.tags))).sorted()
     }
 
+    var connectionGroups: [String] {
+        Array(Set(connections.compactMap { connection in
+            let group = connection.group?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return group.isEmpty ? nil : group
+        })).sorted()
+    }
+
     var visibleTransfers: [TransferRecord] {
         guard let selectedTabID else {
             return []
@@ -147,6 +157,14 @@ final class AppState {
 
     func rejectPendingHostKey() {
         hostKeyTrustStore.resolvePendingPrompt(trusted: false)
+    }
+
+    func showNotification(kind: AppNotification.Kind, message: String) {
+        notification = AppNotification(kind: kind, message: message)
+    }
+
+    func dismissNotification() {
+        notification = nil
     }
 
     func closeTab(_ id: TerminalTab.ID) async {
@@ -296,8 +314,12 @@ final class AppState {
         do {
             let files = try await sftpService.list(path: path, session: session)
             updateRemoteFiles(files, path: path, tabID: tabID)
+        } catch SFTPServiceError.unsupportedSession {
+            updateRemoteFiles([], path: path, tabID: tabID)
+            showNotification(kind: .warning, message: t.sftpUnsupportedForConnection)
         } catch {
             updateRemoteFiles([], path: path, tabID: tabID)
+            showNotification(kind: .error, message: t.sftpRefreshFailed(String(describing: error)))
         }
     }
 
@@ -437,12 +459,8 @@ final class AppState {
             sessionID: context.tabID
         )
 
-        do {
-            try await sftpService.upload(localPath: localPath, remotePath: remoteFilePath, session: context.session)
-            completeTransfer(transfer.id)
-            await refreshRemoteFiles(tabID: context.tabID, path: context.path, session: context.session)
-        } catch {
-            failTransfer(transfer.id, message: String(describing: error))
+        await runTrackedTransfer(transfer.id) {
+            await self.runUploadTransfer(transfer.id, localPath: localPath, remotePath: remoteFilePath)
         }
     }
 
@@ -455,7 +473,7 @@ final class AppState {
     }
 
     func downloadFile(remoteFile: RemoteFile, localPath: String) async {
-        guard let session = selectedSession else {
+        guard selectedSession != nil else {
             recordFailedTransfer(
                 direction: .download,
                 localPath: localPath,
@@ -474,28 +492,59 @@ final class AppState {
             totalBytes: remoteFile.size
         )
 
-        do {
-            try await sftpService.download(
+        await runTrackedTransfer(transfer.id) {
+            await self.runDownloadTransfer(
+                transfer.id,
                 remotePath: remoteFile.path,
                 localPath: localPath,
-                resumeFrom: resumeOffset,
-                progress: { [weak self] bytesCompleted, totalBytes in
-                    await self?.updateTransferProgress(
-                        transfer.id,
-                        bytesCompleted: bytesCompleted,
-                        totalBytes: totalBytes
-                    )
-                },
-                session: session
+                totalBytes: remoteFile.size
             )
-            completeTransfer(transfer.id)
-        } catch {
-            failTransfer(transfer.id, message: String(describing: error))
+        }
+    }
+
+    func cancelTransfer(_ id: TransferRecord.ID) {
+        guard let index = transfers.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+
+        guard transfers[index].state == .running || transfers[index].state == .queued else {
+            return
+        }
+
+        transferTasks[id]?.cancel()
+        transferTasks[id] = nil
+        transfers[index].state = .cancelled
+    }
+
+    func retryTransfer(_ id: TransferRecord.ID) async {
+        guard let index = transfers.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+
+        let transfer = transfers[index]
+        guard transfer.state == .failed || transfer.state == .cancelled else {
+            return
+        }
+
+        transfers[index].state = .running
+        transfers[index].errorMessage = nil
+        transfers[index].bytesCompleted = 0
+
+        switch transfer.direction {
+        case .download:
+            await runTrackedTransfer(id) {
+                await self.runDownloadTransfer(id, remotePath: transfer.remotePath, localPath: transfer.localPath, totalBytes: transfer.totalBytes)
+            }
+        case .upload:
+            await runTrackedTransfer(id) {
+                await self.runUploadTransfer(id, localPath: transfer.localPath, remotePath: transfer.remotePath)
+            }
         }
     }
 
     func beginNewConnection() {
         draftAlias = ""
+        draftGroup = ""
         draftHost = ""
         draftPort = "22"
         draftUsername = ""
@@ -655,6 +704,7 @@ final class AppState {
         let alias = draftAlias.trimmingCharacters(in: .whitespacesAndNewlines)
         let host = draftHost.trimmingCharacters(in: .whitespacesAndNewlines)
         let username = draftUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+        let group = draftGroup.trimmingCharacters(in: .whitespacesAndNewlines)
         let privateKeyPath = draftPrivateKeyPath.trimmingCharacters(in: .whitespacesAndNewlines)
         let jumpHost = draftJumpHost.trimmingCharacters(in: .whitespacesAndNewlines)
         let defaultRemotePath = draftDefaultRemotePath.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -687,6 +737,7 @@ final class AppState {
             username: username,
             authentication: authentication,
             tags: parseTags(draftTags),
+            group: group.isEmpty ? nil : group,
             keepAlive: .init(
                 isEnabled: draftKeepAliveEnabled,
                 intervalSeconds: keepAliveInterval,
@@ -858,6 +909,79 @@ final class AppState {
         return transfer
     }
 
+    private func runTrackedTransfer(
+        _ id: TransferRecord.ID,
+        operation: @escaping @MainActor () async -> Void
+    ) async {
+        let task = Task { @MainActor in
+            await operation()
+        }
+        transferTasks[id] = task
+        await task.value
+        transferTasks[id] = nil
+    }
+
+    private func runUploadTransfer(
+        _ id: TransferRecord.ID,
+        localPath: String,
+        remotePath: String
+    ) async {
+        guard let context = selectedSFTPContext else {
+            failTransfer(id, message: t.noActiveSSHSession)
+            return
+        }
+
+        do {
+            try Task.checkCancellation()
+            try await sftpService.upload(localPath: localPath, remotePath: remotePath, session: context.session)
+            try Task.checkCancellation()
+            completeTransfer(id)
+            await refreshRemoteFiles(tabID: context.tabID, path: context.path, session: context.session)
+        } catch is CancellationError {
+            cancelTransfer(id)
+        } catch {
+            failTransfer(id, message: String(describing: error))
+        }
+    }
+
+    private func runDownloadTransfer(
+        _ id: TransferRecord.ID,
+        remotePath: String,
+        localPath: String,
+        totalBytes: Int64
+    ) async {
+        guard let session = selectedSession else {
+            failTransfer(id, message: t.noActiveSSHSession)
+            return
+        }
+
+        let resumeOffset = localFileSize(at: localPath)
+        updateTransferProgress(id, bytesCompleted: resumeOffset, totalBytes: totalBytes)
+
+        do {
+            try Task.checkCancellation()
+            try await sftpService.download(
+                remotePath: remotePath,
+                localPath: localPath,
+                resumeFrom: resumeOffset,
+                progress: { [weak self] bytesCompleted, totalBytes in
+                    await self?.updateTransferProgress(
+                        id,
+                        bytesCompleted: bytesCompleted,
+                        totalBytes: totalBytes
+                    )
+                },
+                session: session
+            )
+            try Task.checkCancellation()
+            completeTransfer(id)
+        } catch is CancellationError {
+            cancelTransfer(id)
+        } catch {
+            failTransfer(id, message: String(describing: error))
+        }
+    }
+
     private func recordFailedTransfer(
         direction: TransferRecord.Direction,
         localPath: String,
@@ -879,6 +1003,9 @@ final class AppState {
         guard let index = transfers.firstIndex(where: { $0.id == id }) else {
             return
         }
+        guard transfers[index].state != .cancelled else {
+            return
+        }
 
         transfers[index].bytesCompleted = max(transfers[index].bytesCompleted, transfers[index].totalBytes)
         transfers[index].state = .completed
@@ -892,6 +1019,9 @@ final class AppState {
         guard let index = transfers.firstIndex(where: { $0.id == id }) else {
             return
         }
+        guard transfers[index].state != .cancelled else {
+            return
+        }
 
         transfers[index].bytesCompleted = bytesCompleted
         transfers[index].totalBytes = totalBytes
@@ -899,6 +1029,9 @@ final class AppState {
 
     private func failTransfer(_ id: TransferRecord.ID, message: String) {
         guard let index = transfers.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        guard transfers[index].state != .cancelled else {
             return
         }
 
@@ -916,142 +1049,4 @@ private struct SFTPContext {
     var tabID: TerminalTab.ID
     var path: String
     var session: SSHSessionProviding
-}
-
-@MainActor
-final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
-    private let defaults: UserDefaults
-    private let defaultsKey = "TermTP.trustedHostKeys"
-    private var trustedKeys: [String: String]
-    private var pendingContinuation: CheckedContinuation<Bool, Never>?
-    var pendingPrompt: HostKeyPrompt?
-    var onPromptChanged: ((HostKeyPrompt?) -> Void)?
-
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-        self.trustedKeys = defaults.dictionary(forKey: defaultsKey) as? [String: String] ?? [:]
-    }
-
-    func trustedKey(host: String, port: UInt16) async -> String? {
-        trustedKeys[key(for: host, port: port)]
-    }
-
-    func saveTrustedKey(_ key: String, host: String, port: UInt16) async throws {
-        trustedKeys[self.key(for: host, port: port)] = key
-        defaults.set(trustedKeys, forKey: defaultsKey)
-    }
-
-    func requestTrust(for prompt: HostKeyPrompt) async -> Bool {
-        pendingPrompt = prompt
-        onPromptChanged?(prompt)
-        return await withCheckedContinuation { continuation in
-            pendingContinuation = continuation
-        }
-    }
-
-    func resolvePendingPrompt(trusted: Bool) {
-        if trusted, let pendingPrompt {
-            trustedKeys[key(for: pendingPrompt.host, port: pendingPrompt.port)] = pendingPrompt.key
-            defaults.set(trustedKeys, forKey: defaultsKey)
-        }
-
-        pendingPrompt = nil
-        onPromptChanged?(nil)
-        pendingContinuation?.resume(returning: trusted)
-        pendingContinuation = nil
-    }
-
-    private func key(for host: String, port: UInt16) -> String {
-        "\(host):\(port)"
-    }
-}
-
-struct SSHConnectionTimeoutError: Error, Equatable, CustomStringConvertible {
-    var message: String
-
-    var description: String {
-        message
-    }
-}
-
-struct TerminalTab: Identifiable, Equatable {
-    var id: UUID
-    var title: String
-    var state: SSHSessionState
-    var transcript: String
-    var remotePath: String
-    var localProcess: TerminalLocalProcess?
-    var session: SSHSessionProviding?
-
-    init(
-        id: UUID = UUID(),
-        title: String,
-        state: SSHSessionState,
-        transcript: String,
-        remotePath: String = ".",
-        localProcess: TerminalLocalProcess? = nil,
-        session: SSHSessionProviding? = nil
-    ) {
-        self.id = id
-        self.title = title
-        self.state = state
-        self.transcript = transcript
-        self.remotePath = remotePath
-        self.localProcess = localProcess
-        self.session = session
-    }
-
-    static func == (lhs: TerminalTab, rhs: TerminalTab) -> Bool {
-        lhs.id == rhs.id
-            && lhs.title == rhs.title
-            && lhs.state == rhs.state
-            && lhs.transcript == rhs.transcript
-            && lhs.remotePath == rhs.remotePath
-            && lhs.localProcess == rhs.localProcess
-    }
-}
-
-struct TerminalCommand: Identifiable, Equatable {
-    var id = UUID()
-    var text: String
-}
-
-enum TerminalLocalProcess: Equatable {
-    case ssh(ConnectionRecord, credential: Credential?)
-}
-
-private extension ConnectionRecord {
-    var requiresLocalSSHOnly: Bool {
-        jumpHost?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-    }
-}
-
-private actor LocalSSHOnlySession: SSHSessionProviding {
-    let id = UUID()
-    let record: ConnectionRecord
-
-    init(record: ConnectionRecord) {
-        self.record = record
-    }
-
-    var state: SSHSessionState {
-        .connected
-    }
-
-    func send(_ input: String) async throws {}
-
-    func drainOutput() async -> String {
-        ""
-    }
-
-    func disconnect() async throws {}
-}
-
-extension TerminalTab {
-    static let welcome = TerminalTab(
-        id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
-        title: AppStrings(language: .zhHans).welcomeTitle,
-        state: .disconnected,
-        transcript: AppStrings(language: .zhHans).welcomeMessage
-    )
 }

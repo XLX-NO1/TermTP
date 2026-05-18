@@ -4,6 +4,33 @@ import TermCCore
 @testable import TermCApp
 
 @MainActor
+@Test func showNotificationStoresUserVisibleMessageAndDismissesIt() {
+    let state = AppState(connections: [], language: .zhHans)
+
+    state.showNotification(kind: .error, message: "导入失败")
+
+    #expect(state.notification?.kind == .error)
+    #expect(state.notification?.message == "导入失败")
+
+    state.dismissNotification()
+
+    #expect(state.notification == nil)
+}
+
+@MainActor
+@Test func refreshRemoteFilesReportsUnsupportedSFTPToUser() async {
+    let tab = TerminalTab(title: "Jump", state: .connected, transcript: "", session: UnsupportedSFTPSession())
+    let state = AppState(tabs: [tab], connections: [], language: .zhHans)
+    state.selectedTabID = tab.id
+
+    await state.refreshRemoteFiles()
+
+    #expect(state.remoteFiles.isEmpty)
+    #expect(state.notification?.kind == .warning)
+    #expect(state.notification?.message == "当前连接暂不支持 SFTP 文件管理")
+}
+
+@MainActor
 @Test func menuBarTemplateImageFallsBackWhenResourceIsMissing() {
     let image = MenuBarController.makeMenuBarTemplateImage()
 
@@ -45,6 +72,20 @@ import TermCCore
     state.saveDraftConnection()
 
     #expect(state.connections.isEmpty)
+}
+
+@MainActor
+@Test func saveDraftConnectionStoresConnectionGroup() {
+    let state = AppState(connections: [])
+    state.draftHost = "example.com"
+    state.draftPort = "22"
+    state.draftUsername = "me"
+    state.draftPassword = "secret"
+    state.draftGroup = " 生产 "
+
+    state.saveDraftConnection()
+
+    #expect(state.connections.first?.group == "生产")
 }
 
 @MainActor
@@ -408,6 +449,17 @@ import TermCCore
 }
 
 @MainActor
+@Test func connectionGroupsAreSortedAndIgnoreEmptyValues() {
+    let state = AppState(connections: [
+        ConnectionRecord(alias: "B", host: "b.example.com", username: "me", authentication: .password, group: "生产"),
+        ConnectionRecord(alias: "A", host: "a.example.com", username: "me", authentication: .password, group: "测试"),
+        ConnectionRecord(alias: "None", host: "n.example.com", username: "me", authentication: .password)
+    ])
+
+    #expect(state.connectionGroups == ["测试", "生产"])
+}
+
+@MainActor
 @Test func historyConnectionsExcludeFavorites() {
     var favorite = ConnectionRecord.samplePassword
     favorite.isFavorite = true
@@ -470,6 +522,68 @@ import TermCCore
     state.sendInputToSelectedTab("ls\n")
 
     #expect(state.tabs.first?.transcript == "$ ls\n")
+}
+
+@MainActor
+@Test func failedTransferRemainsVisibleWithErrorMessage() {
+    let tab = TerminalTab(title: "Shell", state: .connected, transcript: "")
+    let state = AppState(tabs: [tab], connections: [], transfers: [
+        TransferRecord(
+            sessionID: tab.id,
+            direction: .download,
+            localPath: "/tmp/app.log",
+            remotePath: "/var/log/app.log",
+            state: .failed,
+            errorMessage: "Permission denied"
+        )
+    ])
+    state.selectedTabID = tab.id
+
+    #expect(state.visibleTransfers.first?.errorMessage == "Permission denied")
+}
+
+@MainActor
+@Test func cancelTransferMarksRunningTransferCancelled() {
+    let tab = TerminalTab(title: "Shell", state: .connected, transcript: "")
+    let transfer = TransferRecord(
+        sessionID: tab.id,
+        direction: .download,
+        localPath: "/tmp/app.log",
+        remotePath: "/var/log/app.log",
+        state: .running
+    )
+    let state = AppState(tabs: [tab], connections: [], transfers: [transfer])
+
+    state.cancelTransfer(transfer.id)
+
+    #expect(state.transfers.first?.state == .cancelled)
+}
+
+@MainActor
+@Test func retryFailedDownloadClearsErrorAndCompletesTransfer() async throws {
+    let session = FakeSSHSession(record: .samplePassword)
+    let tab = TerminalTab(title: "Shell", state: .connected, transcript: "", session: session)
+    let transfer = TransferRecord(
+        sessionID: tab.id,
+        direction: .download,
+        localPath: "/tmp/retry.log",
+        remotePath: "/var/log/retry.log",
+        state: .failed,
+        errorMessage: "Network lost"
+    )
+    let state = AppState(
+        tabs: [tab],
+        connections: [],
+        transfers: [transfer],
+        sftpService: RetrySFTPService(totalBytes: 4)
+    )
+    state.selectedTabID = tab.id
+
+    await state.retryTransfer(transfer.id)
+
+    #expect(state.transfers.first?.state == .completed)
+    #expect(state.transfers.first?.errorMessage == nil)
+    #expect(state.transfers.first?.bytesCompleted == 4)
 }
 
 @MainActor
@@ -711,6 +825,15 @@ private struct FailingSSHClient: SSHClientProviding {
     }
 }
 
+private actor UnsupportedSFTPSession: SSHSessionProviding {
+    let id = UUID()
+    let record = ConnectionRecord.samplePassword
+    var state: SSHSessionState { .connected }
+    func send(_ input: String) async throws {}
+    func drainOutput() async -> String { "" }
+    func disconnect() async throws {}
+}
+
 private actor RecordingSFTPService: SFTPServicing {
     private let filesByPath: [String: [RemoteFile]]
     private(set) var listedPaths: [String] = []
@@ -827,6 +950,36 @@ private actor ProgressRecordingSFTPService: SFTPServicing {
         session: SSHSessionProviding
     ) async throws {
         await progress(offset, totalBytes)
+        await progress(totalBytes, totalBytes)
+    }
+
+    func makeDirectory(remotePath: String, session: SSHSessionProviding) async throws {}
+
+    func delete(remotePath: String, kind: RemoteFile.Kind, session: SSHSessionProviding) async throws {}
+
+    func rename(remotePath: String, to newRemotePath: String, session: SSHSessionProviding) async throws {}
+}
+
+private actor RetrySFTPService: SFTPServicing {
+    private let totalBytes: Int64
+
+    init(totalBytes: Int64) {
+        self.totalBytes = totalBytes
+    }
+
+    func list(path: String, session: SSHSessionProviding) async throws -> [RemoteFile] { [] }
+
+    func upload(localPath: String, remotePath: String, session: SSHSessionProviding) async throws {}
+
+    func download(remotePath: String, localPath: String, session: SSHSessionProviding) async throws {}
+
+    func download(
+        remotePath: String,
+        localPath: String,
+        resumeFrom offset: Int64,
+        progress: @escaping ProgressHandler,
+        session: SSHSessionProviding
+    ) async throws {
         await progress(totalBytes, totalBytes)
     }
 

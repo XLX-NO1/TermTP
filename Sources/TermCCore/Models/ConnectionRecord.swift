@@ -72,6 +72,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
     public var username: String
     public var authentication: ConnectionAuthentication
     public var tags: [String]
+    public var group: String?
     public var isFavorite: Bool
     public var keepAlive: KeepAlive
     public var jumpHost: String?
@@ -89,6 +90,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
         username: String,
         authentication: ConnectionAuthentication,
         tags: [String] = [],
+        group: String? = nil,
         isFavorite: Bool = false,
         keepAlive: KeepAlive = KeepAlive(),
         jumpHost: String? = nil,
@@ -105,6 +107,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
         self.username = username
         self.authentication = authentication
         self.tags = tags
+        self.group = group
         self.isFavorite = isFavorite
         self.keepAlive = keepAlive
         self.jumpHost = jumpHost
@@ -123,6 +126,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
         case username
         case authentication
         case tags
+        case group
         case isFavorite
         case keepAlive
         case jumpHost
@@ -142,6 +146,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
         self.username = try container.decode(String.self, forKey: .username)
         self.authentication = try container.decode(ConnectionAuthentication.self, forKey: .authentication)
         self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+        self.group = try container.decodeIfPresent(String.self, forKey: .group)
         self.isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
         self.keepAlive = try container.decodeIfPresent(KeepAlive.self, forKey: .keepAlive) ?? KeepAlive()
         self.jumpHost = try container.decodeIfPresent(String.self, forKey: .jumpHost)
