@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import TermCCore
 
@@ -65,6 +66,26 @@ struct ConnectionSidebarView: View {
             connectionSection(state.t.history, connections: history, isHistory: true)
 
             Spacer(minLength: 0)
+
+            HStack(spacing: 6) {
+                Button {
+                    importConnections()
+                } label: {
+                    Label(state.t.importConnections, systemImage: "square.and.arrow.down")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Button {
+                    exportConnections()
+                } label: {
+                    Label(state.t.exportConnections, systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
 
             Button {
                 state.clearHistory()
@@ -137,6 +158,44 @@ struct ConnectionSidebarView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func importConnections() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.json]
+
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return
+        }
+
+        Task {
+            do {
+                let data = try Data(contentsOf: url)
+                try await state.importConnections(from: data)
+            } catch {
+                NSSound.beep()
+            }
+        }
+    }
+
+    private func exportConnections() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "termtp-connections.json"
+
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return
+        }
+
+        do {
+            let data = try state.exportConnections()
+            try data.write(to: url, options: .atomic)
+        } catch {
+            NSSound.beep()
         }
     }
 }

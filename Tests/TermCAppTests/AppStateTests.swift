@@ -424,6 +424,44 @@ import TermCCore
 }
 
 @MainActor
+@Test func exportConnectionsReturnsPortableData() throws {
+    let state = AppState(connections: [.samplePassword])
+
+    let data = try state.exportConnections()
+    let json = String(decoding: data, as: UTF8.self)
+
+    #expect(json.contains("\"connections\""))
+    #expect(json.contains("\"localhost\""))
+    #expect(!json.contains("secret"))
+}
+
+@MainActor
+@Test func importConnectionsMergesNewRecordsAndSkipsDuplicates() async throws {
+    let storeURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension("json")
+    let existing = ConnectionRecord.samplePassword
+    let imported = ConnectionRecord(
+        alias: "Imported",
+        host: "imported.example.com",
+        username: "deploy",
+        authentication: .password
+    )
+    let data = try ImportExportService().export([existing, imported])
+    let state = AppState(
+        connections: [existing],
+        connectionStore: ConnectionStore(fileURL: storeURL)
+    )
+
+    try await state.importConnections(from: data)
+
+    #expect(state.connections.map(\.host) == ["localhost", "imported.example.com"])
+
+    let reloaded = try await ConnectionStore(fileURL: storeURL).load()
+    #expect(reloaded.connections.map(\.host) == ["localhost", "imported.example.com"])
+}
+
+@MainActor
 @Test func sendInputAppendsToSelectedTabTranscript() {
     let tab = TerminalTab(title: "Shell", state: .connected, transcript: "$ ")
     let state = AppState(tabs: [tab], connections: [])

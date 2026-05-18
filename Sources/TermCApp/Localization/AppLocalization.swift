@@ -63,6 +63,8 @@ struct AppStrings: Equatable, Sendable {
     var favorites: String { self["favorites"] }
     var history: String { self["history"] }
     var clearHistory: String { self["clearHistory"] }
+    var importConnections: String { self["importConnections"] }
+    var exportConnections: String { self["exportConnections"] }
     var noConnections: String { self["noConnections"] }
     var addToFavorites: String { self["addToFavorites"] }
     var removeFromFavorites: String { self["removeFromFavorites"] }
@@ -155,6 +157,8 @@ struct AppStrings: Equatable, Sendable {
             "favorites": "收藏",
             "history": "历史",
             "clearHistory": "清空历史",
+            "importConnections": "导入",
+            "exportConnections": "导出",
             "noConnections": "暂无连接",
             "addToFavorites": "加入收藏",
             "removeFromFavorites": "取消收藏",
@@ -244,6 +248,8 @@ struct AppStrings: Equatable, Sendable {
             "favorites": "Favorites",
             "history": "History",
             "clearHistory": "Clear History",
+            "importConnections": "Import",
+            "exportConnections": "Export",
             "noConnections": "No connections",
             "addToFavorites": "Add to Favorites",
             "removeFromFavorites": "Remove from Favorites",

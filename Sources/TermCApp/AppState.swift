@@ -206,6 +206,29 @@ final class AppState {
         }
     }
 
+    func exportConnections() throws -> Data {
+        try ImportExportService().export(connections)
+    }
+
+    func importConnections(from data: Data) async throws {
+        let importedConnections = try ImportExportService().import(data)
+        var existingKeys = Set(connections.map(importKey))
+        var nextConnections = connections
+
+        for connection in importedConnections {
+            let key = importKey(for: connection)
+            guard !existingKeys.contains(key) else {
+                continue
+            }
+
+            existingKeys.insert(key)
+            nextConnections.append(connection)
+        }
+
+        connections = nextConnections
+        await persistConnections()
+    }
+
     func sendInputToSelectedTab(_ input: String) {
         guard let selectedTabID else {
             return
@@ -684,6 +707,10 @@ final class AppState {
             .split { $0 == "," || $0 == " " || $0 == "\n" || $0 == "\t" }
             .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+
+    private func importKey(for connection: ConnectionRecord) -> String {
+        "\(connection.host):\(connection.port):\(connection.username):\(connection.alias)"
     }
 
     private func makeDraftPortForwards(
