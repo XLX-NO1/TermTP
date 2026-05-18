@@ -7,16 +7,16 @@ struct TermCApp: App {
 
     var body: some Scene {
         Settings {
-            EmptyView()
+            SettingsView(state: appDelegate.state)
         }
         .commands {
-            CommandMenu("View") {
-                Button("Toggle Connections") {
+            CommandMenu(appDelegate.state.t.view) {
+                Button(appDelegate.state.t.toggleConnections) {
                     appDelegate.state.toggleSidebar()
                 }
                 .keyboardShortcut("1", modifiers: [.command, .option])
 
-                Button("Toggle SFTP Drawer") {
+                Button(appDelegate.state.t.toggleSFTPDrawer) {
                     appDelegate.state.toggleSFTPDrawer()
                 }
                 .keyboardShortcut("2", modifiers: [.command, .option])

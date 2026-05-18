@@ -7,6 +7,7 @@ struct LocalSSHTerminalView: NSViewRepresentable {
     let connection: ConnectionRecord
     let credential: Credential?
     var fontSize: Double = 11
+    var strings = AppStrings(language: .zhHans)
     var pendingCommand: TerminalCommand?
     var onCommandHandled: (TerminalCommand.ID) -> Void = { _ in }
 
@@ -46,7 +47,7 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         )
         terminalView.caretColor = terminalView.nativeForegroundColor
         terminalView.layer?.backgroundColor = NSColor.black.cgColor
-        terminalView.menu = terminalContextMenu(for: terminalView)
+        terminalView.menu = terminalContextMenu(for: terminalView, strings: strings)
     }
 
     private func startSSH(in terminalView: LocalProcessTerminalView, context: Context) {
@@ -152,10 +153,10 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         return url.path
     }
 
-    private func terminalContextMenu(for terminalView: LocalProcessTerminalView) -> NSMenu {
+    private func terminalContextMenu(for terminalView: LocalProcessTerminalView, strings: AppStrings) -> NSMenu {
         let menu = NSMenu()
         let copyItem = NSMenuItem(
-            title: "Copy",
+            title: strings.copy,
             action: #selector(LocalProcessTerminalView.copy(_:)),
             keyEquivalent: ""
         )
@@ -163,7 +164,7 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         menu.addItem(copyItem)
 
         let pasteItem = NSMenuItem(
-            title: "Paste",
+            title: strings.paste,
             action: #selector(LocalProcessTerminalView.paste(_:)),
             keyEquivalent: ""
         )
@@ -269,6 +270,12 @@ extension LocalSSHTerminalView {
         var view = self
         view.pendingCommand = command
         view.onCommandHandled = onHandled
+        return view
+    }
+
+    func localized(_ strings: AppStrings) -> LocalSSHTerminalView {
+        var view = self
+        view.strings = strings
         return view
     }
 }

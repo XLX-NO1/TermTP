@@ -11,45 +11,34 @@ final class MenuBarController: NSObject {
     func install(state: AppState, windowController: TermTPWindowController) {
         self.state = state
         self.windowController = windowController
-        if statusItem != nil {
-            return
-        }
-
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        let item = statusItem ?? NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = Self.makeMenuBarTemplateImage()
         item.button?.imagePosition = .imageOnly
         item.button?.toolTip = "TermTP"
+        item.menu = makeMenu(strings: state.t)
+        statusItem = item
+    }
 
+    func refreshMenu() {
+        guard let state, let statusItem else {
+            return
+        }
+
+        statusItem.menu = makeMenu(strings: state.t)
+    }
+
+    private func makeMenu(strings: AppStrings) -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(
-            NSMenuItem(
-                title: "Show TermTP",
-                action: #selector(showTermC(_:)),
-                keyEquivalent: ""
-            )
-        )
-        menu.addItem(
-            NSMenuItem(
-                title: "New Connection",
-                action: #selector(newConnection(_:)),
-                keyEquivalent: ""
-            )
-        )
+        menu.addItem(NSMenuItem(title: strings.showTermTP, action: #selector(showTermC(_:)), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: strings.newConnection, action: #selector(newConnection(_:)), keyEquivalent: ""))
         menu.addItem(.separator())
-        menu.addItem(
-            NSMenuItem(
-                title: "Quit TermTP",
-                action: #selector(quitTermTP(_:)),
-                keyEquivalent: "q"
-            )
-        )
+        menu.addItem(NSMenuItem(title: strings.quitTermTP, action: #selector(quitTermTP(_:)), keyEquivalent: "q"))
 
         for menuItem in menu.items {
             menuItem.target = self
         }
 
-        item.menu = menu
-        statusItem = item
+        return menu
     }
 
     @objc func showTermC(_ sender: Any?) {

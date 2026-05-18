@@ -29,52 +29,52 @@ struct ConnectionFormView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("New Connection")
+            Text(state.t.newConnection)
                 .font(.title2)
                 .fontWeight(.semibold)
 
             Form {
-                TextField("Alias", text: $state.draftAlias)
-                TextField("Host", text: $state.draftHost)
-                TextField("Port", text: $state.draftPort)
-                TextField("Username", text: $state.draftUsername)
-                TextField("Tags", text: $state.draftTags)
+                TextField(state.t.alias, text: $state.draftAlias)
+                TextField(state.t.host, text: $state.draftHost)
+                TextField(state.t.port, text: $state.draftPort)
+                TextField(state.t.username, text: $state.draftUsername)
+                TextField(state.t.tags, text: $state.draftTags)
 
-                Toggle("Use private key", isOn: $state.draftUsesKey)
+                Toggle(state.t.usePrivateKey, isOn: $state.draftUsesKey)
 
                 if state.draftUsesKey {
-                    TextField("Private key path", text: $state.draftPrivateKeyPath)
-                    SecureField("Private key passphrase", text: $state.draftPrivateKeyPassphrase)
+                    TextField(state.t.privateKeyPath, text: $state.draftPrivateKeyPath)
+                    SecureField(state.t.privateKeyPassphrase, text: $state.draftPrivateKeyPassphrase)
                 } else {
-                    SecureField("Password", text: $state.draftPassword)
+                    SecureField(state.t.password, text: $state.draftPassword)
                 }
 
-                Section("Connection") {
-                    Toggle("Keep connection alive", isOn: $state.draftKeepAliveEnabled)
+                Section(state.t.connection) {
+                    Toggle(state.t.keepConnectionAlive, isOn: $state.draftKeepAliveEnabled)
 
                     if state.draftKeepAliveEnabled {
-                        TextField("Alive interval seconds", text: $state.draftKeepAliveInterval)
-                        TextField("Alive max count", text: $state.draftKeepAliveMaxCount)
+                        TextField(state.t.aliveIntervalSeconds, text: $state.draftKeepAliveInterval)
+                        TextField(state.t.aliveMaxCount, text: $state.draftKeepAliveMaxCount)
                     }
 
-                    TextField("Jump host", text: $state.draftJumpHost)
+                    TextField(state.t.jumpHost, text: $state.draftJumpHost)
                 }
 
-                Section("Port Forwarding") {
-                    Toggle("Enable forwarding", isOn: $state.draftForwardEnabled)
+                Section(state.t.portForwarding) {
+                    Toggle(state.t.enableForwarding, isOn: $state.draftForwardEnabled)
 
                     if state.draftForwardEnabled {
-                        Picker("Type", selection: $state.draftForwardDirection) {
-                            Text("Local").tag(ConnectionRecord.PortForward.Direction.local)
-                            Text("Remote").tag(ConnectionRecord.PortForward.Direction.remote)
-                            Text("Dynamic").tag(ConnectionRecord.PortForward.Direction.dynamic)
+                        Picker(state.t.type, selection: $state.draftForwardDirection) {
+                            Text(state.t.local).tag(ConnectionRecord.PortForward.Direction.local)
+                            Text(state.t.remote).tag(ConnectionRecord.PortForward.Direction.remote)
+                            Text(state.t.dynamic).tag(ConnectionRecord.PortForward.Direction.dynamic)
                         }
-                        TextField("Bind address", text: $state.draftForwardBindAddress)
-                        TextField("Port", text: $state.draftForwardLocalPort)
+                        TextField(state.t.bindAddress, text: $state.draftForwardBindAddress)
+                        TextField(state.t.port, text: $state.draftForwardLocalPort)
 
                         if state.draftForwardDirection != .dynamic {
-                            TextField("Destination host", text: $state.draftForwardDestinationHost)
-                            TextField("Destination port", text: $state.draftForwardDestinationPort)
+                            TextField(state.t.destinationHost, text: $state.draftForwardDestinationHost)
+                            TextField(state.t.destinationPort, text: $state.draftForwardDestinationPort)
                         }
                     }
                 }
@@ -84,13 +84,13 @@ struct ConnectionFormView: View {
             HStack {
                 Spacer()
 
-                Button("Cancel", role: .cancel) {
+                Button(state.t.cancel, role: .cancel) {
                     state.isConnectionFormPresented = false
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
 
-                Button("Connect") {
+                Button(state.t.connect) {
                     Task {
                         await state.connectDraftConnection()
                     }

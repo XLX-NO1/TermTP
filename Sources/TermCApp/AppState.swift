@@ -20,6 +20,11 @@ final class AppState {
     var isSidebarVisible = true
     var isSFTPDrawerVisible = true
     var terminalFontSize: Double = 11
+    var language: AppLanguage {
+        didSet {
+            defaults.set(language.rawValue, forKey: Self.languageDefaultsKey)
+        }
+    }
     var selectedTabID: TerminalTab.ID?
     var tabs: [TerminalTab]
     var pendingTerminalCommands: [TerminalTab.ID: TerminalCommand] = [:]
@@ -49,10 +54,19 @@ final class AppState {
     var remotePath = "."
     var remoteFiles: [RemoteFile] = []
 
+    var t: AppStrings {
+        AppStrings(language: language)
+    }
+
+    private static let languageDefaultsKey = "TermTP.language"
+    private let defaults: UserDefaults
+
     init(
         tabs: [TerminalTab] = [.welcome],
         connections: [ConnectionRecord] = [.samplePassword],
         transfers: [TransferRecord] = [],
+        language: AppLanguage? = nil,
+        defaults: UserDefaults = .standard,
         sshClient: (any SSHClientProviding)? = nil,
         credentialStore: any CredentialStoring = KeychainCredentialStore(),
         sftpService: any SFTPServicing = CitadelSFTPService(),
@@ -69,9 +83,12 @@ final class AppState {
         self.sftpService = sftpService
         self.connectionStore = connectionStore
         self.connectionTimeoutSeconds = connectionTimeoutSeconds
+        self.defaults = defaults
         self.tabs = tabs
         self.connections = connections
         self.transfers = transfers
+        let storedLanguage = defaults.string(forKey: Self.languageDefaultsKey).flatMap(AppLanguage.init(rawValue:))
+        self.language = language ?? storedLanguage ?? AppLanguage.default
         self.selectedTabID = tabs.first?.id
         hostKeyTrustStore.onPromptChanged = { [weak self] prompt in
             self?.pendingHostKeyPrompt = prompt
@@ -370,7 +387,7 @@ final class AppState {
                 direction: .upload,
                 localPath: localPath,
                 remotePath: remoteDirectoryPath,
-                message: "No active SSH session"
+                message: t.noActiveSSHSession
             )
             return
         }
@@ -406,7 +423,7 @@ final class AppState {
                 direction: .download,
                 localPath: localPath,
                 remotePath: remoteFile.path,
-                message: "No active SSH session"
+                message: t.noActiveSSHSession
             )
             return
         }
@@ -526,7 +543,7 @@ final class AppState {
         let tab = TerminalTab(
             title: connection.alias,
             state: .connecting,
-            transcript: "Connecting to \(connection.username)@\(connection.host):\(connection.port)...\n"
+            transcript: "\(t.connectingTo) \(connection.username)@\(connection.host):\(connection.port)...\n"
         )
         tabs.append(tab)
         selectedTabID = tab.id
@@ -536,7 +553,7 @@ final class AppState {
                 id: tab.id,
                 state: .connected,
                 transcript: """
-                Connected to \(connection.username)@\(connection.host):\(connection.port)
+                \(t.connectedTo) \(connection.username)@\(connection.host):\(connection.port)
 
                 """
             )
@@ -552,7 +569,7 @@ final class AppState {
                 id: tab.id,
                 state: .connected,
                 transcript: """
-                Connected to \(connection.username)@\(connection.host):\(connection.port)
+                \(t.connectedTo) \(connection.username)@\(connection.host):\(connection.port)
 
                 """
             )
@@ -565,7 +582,7 @@ final class AppState {
                 id: tab.id,
                 state: .failed(message),
                 transcript: """
-                Failed to connect to \(connection.username)@\(connection.host):\(connection.port)
+                \(t.failedToConnect) \(connection.username)@\(connection.host):\(connection.port)
                 \(message)
 
                 """
@@ -577,17 +594,18 @@ final class AppState {
         record: ConnectionRecord,
         credential: Credential?
     ) async throws -> SSHSessionProviding {
-        try await withThrowingTaskGroup(of: SSHSessionProviding.self) { group in
+        let timeoutMessage = t.connectionTimedOut(seconds: connectionTimeoutSeconds)
+        return try await withThrowingTaskGroup(of: SSHSessionProviding.self) { group in
             group.addTask {
                 try await self.sshClient.connect(record: record, credential: credential)
             }
             group.addTask {
                 try await Task.sleep(for: .seconds(self.connectionTimeoutSeconds))
-                throw SSHConnectionTimeoutError(seconds: self.connectionTimeoutSeconds)
+                throw SSHConnectionTimeoutError(message: timeoutMessage)
             }
 
             guard let session = try await group.next() else {
-                throw SSHConnectionTimeoutError(seconds: self.connectionTimeoutSeconds)
+                throw SSHConnectionTimeoutError(message: timeoutMessage)
             }
             group.cancelAll()
             return session
@@ -893,10 +911,10 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
 }
 
 struct SSHConnectionTimeoutError: Error, Equatable, CustomStringConvertible {
-    var seconds: Double
+    var message: String
 
     var description: String {
-        "Connection timed out after \(seconds) seconds"
+        message
     }
 }
 
@@ -976,12 +994,8 @@ private actor LocalSSHOnlySession: SSHSessionProviding {
 extension TerminalTab {
     static let welcome = TerminalTab(
         id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
-        title: "Welcome",
+        title: AppStrings(language: .zhHans).welcomeTitle,
         state: .disconnected,
-        transcript: """
-        Welcome to TermTP
-
-        Select a connection from the sidebar to start an SSH session.
-        """
+        transcript: AppStrings(language: .zhHans).welcomeMessage
     )
 }

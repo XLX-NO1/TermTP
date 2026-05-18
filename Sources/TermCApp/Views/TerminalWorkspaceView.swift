@@ -11,6 +11,7 @@ struct TerminalWorkspaceView: View {
     var onRenameTab: (TerminalTab.ID, String) -> Void = { _, _ in }
     var onCommandHandled: (TerminalTab.ID, TerminalCommand.ID) -> Void = { _, _ in }
     var onTerminalInput: (String) -> Void = { _ in }
+    var strings = AppStrings(language: .zhHans)
     @State private var tabRenameTarget: TabRenameTarget?
     @State private var tabRenameTitle = ""
 
@@ -32,20 +33,20 @@ struct TerminalWorkspaceView: View {
         .background(Color.black)
         .sheet(item: $tabRenameTarget) { tab in
             VStack(alignment: .leading, spacing: 14) {
-                Text("Rename Tab")
+                Text(strings.renameTab)
                     .font(.headline)
 
-                TextField("Title", text: $tabRenameTitle)
+                TextField(strings.title, text: $tabRenameTitle)
                     .textFieldStyle(.roundedBorder)
 
                 HStack {
                     Spacer()
 
-                    Button("Cancel", role: .cancel) {
+                    Button(strings.cancel, role: .cancel) {
                         tabRenameTarget = nil
                     }
 
-                    Button("OK") {
+                    Button(strings.ok) {
                         onRenameTab(tab.id, tabRenameTitle)
                         tabRenameTarget = nil
                     }
@@ -73,6 +74,7 @@ struct TerminalWorkspaceView: View {
     private func terminalContent(for tab: TerminalTab) -> some View {
         if case .ssh(let connection, let credential) = tab.localProcess {
             LocalSSHTerminalView(connection: connection, credential: credential, fontSize: terminalFontSize)
+                .localized(strings)
                 .pendingCommand(pendingCommands[tab.id]) { commandID in
                     onCommandHandled(tab.id, commandID)
                 }
@@ -110,12 +112,12 @@ struct TerminalWorkspaceView: View {
                 }
                 .buttonStyle(.plain)
                 .contextMenu {
-                    Button("Rename") {
+                    Button(strings.rename) {
                         tabRenameTitle = tab.title
                         tabRenameTarget = TabRenameTarget(id: tab.id, title: tab.title)
                     }
 
-                    Button("Close") {
+                    Button(strings.close) {
                         onCloseTab(tab.id)
                     }
                     .disabled(tabs.count <= 1)

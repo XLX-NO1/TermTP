@@ -124,6 +124,7 @@ import TermCCore
 @Test func connectDraftConnectionFailsAfterTimeout() async {
     let state = AppState(
         connections: [],
+        language: .zhHans,
         sshClient: HangingSSHClient(),
         connectionTimeoutSeconds: 0.01
     )
@@ -135,8 +136,8 @@ import TermCCore
 
     await state.connectDraftConnection()
 
-    #expect(state.tabs.last?.state == .failed("Connection timed out after 0.01 seconds"))
-    #expect(state.tabs.last?.transcript.contains("Connection timed out after 0.01 seconds") == true)
+    #expect(state.tabs.last?.state == .failed("连接超时，已等待 0.01 秒"))
+    #expect(state.tabs.last?.transcript.contains("连接超时，已等待 0.01 秒") == true)
 }
 
 @MainActor
@@ -666,7 +667,7 @@ private struct HangingSSHClient: SSHClientProviding {
 
 private struct FailingSSHClient: SSHClientProviding {
     func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
-        throw SSHConnectionTimeoutError(seconds: 0)
+        throw SSHConnectionTimeoutError(message: "连接失败")
     }
 }
 
@@ -796,8 +797,8 @@ private actor ProgressRecordingSFTPService: SFTPServicing {
     func rename(remotePath: String, to newRemotePath: String, session: SSHSessionProviding) async throws {}
 }
 
-@Test func welcomeTabUsesTermTPBrandName() {
-    #expect(TerminalTab.welcome.transcript.contains("Welcome to TermTP"))
+@Test func welcomeTabUsesChineseTermTPBrandName() {
+    #expect(TerminalTab.welcome.transcript.contains("欢迎使用 TermTP"))
 }
 
 @Test func layoutUsesCompactRightSidebarAndBottomTransferArea() {

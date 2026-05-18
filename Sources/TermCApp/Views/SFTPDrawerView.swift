@@ -21,12 +21,12 @@ struct SFTPDrawerView: View {
             }
         }
 
-        var title: String {
+        func title(_ strings: AppStrings) -> String {
             switch self {
             case .createDirectory:
-                return "New Folder"
+                return strings.newFolder
             case .rename:
-                return "Rename"
+                return strings.rename
             }
         }
     }
@@ -50,7 +50,7 @@ struct SFTPDrawerView: View {
                 }
                 .buttonStyle(.borderless)
                 .controlSize(.small)
-                .help("Refresh")
+                .help(state.t.refresh)
             }
 
             HStack(spacing: 6) {
@@ -65,9 +65,9 @@ struct SFTPDrawerView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(state.remotePath == "." || state.remotePath == "/" ? .white.opacity(0.28) : .white)
                 .disabled(state.remotePath == "." || state.remotePath == "/")
-                .help("Parent Directory")
+                .help(state.t.parentDirectory)
 
-                TextField("Remote path", text: $pathInput)
+                TextField(state.t.remotePath, text: $pathInput)
                     .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.white)
                     .textFieldStyle(.plain)
@@ -88,15 +88,15 @@ struct SFTPDrawerView: View {
                         pathInput = newValue
                     }
                     .contextMenu {
-                        Button("Upload Here") {
+                        Button(state.t.uploadHere) {
                             chooseUploadFile()
                         }
 
-                        Button("New Folder") {
+                        Button(state.t.newFolder) {
                             showCreateDirectoryPrompt()
                         }
 
-                        Button("Refresh") {
+                        Button(state.t.refresh) {
                             Task {
                                 await state.refreshRemoteFiles()
                             }
@@ -112,15 +112,15 @@ struct SFTPDrawerView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .contextMenu {
-                    Button("Upload Here") {
+                    Button(state.t.uploadHere) {
                         chooseUploadFile()
                     }
 
-                    Button("New Folder") {
+                    Button(state.t.newFolder) {
                         showCreateDirectoryPrompt()
                     }
 
-                    Button("Refresh") {
+                    Button(state.t.refresh) {
                         Task {
                             await state.refreshRemoteFiles()
                         }
@@ -138,15 +138,15 @@ struct SFTPDrawerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(red: 0.12, green: 0.13, blue: 0.15))
         .contextMenu {
-            Button("Upload Here") {
+            Button(state.t.uploadHere) {
                 chooseUploadFile()
             }
 
-            Button("New Folder") {
+            Button(state.t.newFolder) {
                 showCreateDirectoryPrompt()
             }
 
-            Button("Refresh") {
+            Button(state.t.refresh) {
                 Task {
                     await state.refreshRemoteFiles()
                 }
@@ -159,20 +159,20 @@ struct SFTPDrawerView: View {
         }
         .sheet(item: $namePrompt) { prompt in
             VStack(alignment: .leading, spacing: 14) {
-                Text(prompt.title)
+                Text(prompt.title(state.t))
                     .font(.headline)
 
-                TextField("Name", text: $pendingName)
+                TextField(state.t.name, text: $pendingName)
                     .textFieldStyle(.roundedBorder)
 
                 HStack {
                     Spacer()
 
-                    Button("Cancel", role: .cancel) {
+                    Button(state.t.cancel, role: .cancel) {
                         namePrompt = nil
                     }
 
-                    Button("OK") {
+                    Button(state.t.ok) {
                         submitNamePrompt(prompt)
                     }
                     .keyboardShortcut(.defaultAction)
@@ -248,26 +248,26 @@ struct SFTPDrawerView: View {
         }
         .contextMenu {
             if file.kind == .directory {
-                Button("Open") {
+                Button(state.t.open) {
                     Task {
                         await state.openRemoteDirectory(file)
                     }
                 }
 
-                Button("Upload Here") {
+                Button(state.t.uploadHere) {
                     chooseUploadFile(to: file)
                 }
             } else {
-                Button("Download") {
+                Button(state.t.download) {
                     chooseDownloadLocation(for: file)
                 }
             }
 
-            Button("Rename") {
+            Button(state.t.rename) {
                 showRenamePrompt(for: file)
             }
 
-            Button("Delete", role: .destructive) {
+            Button(state.t.delete, role: .destructive) {
                 Task {
                     await state.deleteRemoteFile(file)
                 }
@@ -341,20 +341,20 @@ struct SFTPDrawerView: View {
     private func transferLabel(for transfer: TransferRecord) -> String {
         switch transfer.state {
         case .completed:
-            return "Done"
+            return state.t.done
         case .failed:
-            return "Failed"
+            return state.t.failed
         case .cancelled:
-            return "Cancelled"
+            return state.t.cancelled
         case .queued:
-            return "Queued"
+            return state.t.queued
         case .running:
             if transfer.totalBytes > 0 {
                 let completed = ByteCountFormatter.string(fromByteCount: transfer.bytesCompleted, countStyle: .file)
                 let total = ByteCountFormatter.string(fromByteCount: transfer.totalBytes, countStyle: .file)
                 return "\(completed) / \(total)"
             }
-            return "Running"
+            return state.t.running
         }
     }
 }

@@ -19,6 +19,10 @@ final class TermTPAppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func refreshMenuBar() {
+        menuBarController.refreshMenu()
+    }
+
     func applicationShouldHandleReopen(
         _ sender: NSApplication,
         hasVisibleWindows flag: Bool

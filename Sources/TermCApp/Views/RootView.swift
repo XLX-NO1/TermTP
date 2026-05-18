@@ -26,7 +26,8 @@ struct RootView: View {
                         },
                         onRenameTab: state.renameTab,
                         onCommandHandled: state.clearPendingTerminalCommand,
-                        onTerminalInput: state.sendInputToSelectedTab
+                        onTerminalInput: state.sendInputToSelectedTab,
+                        strings: state.t
                     )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -50,7 +51,7 @@ struct RootView: View {
             ConnectionFormView(state: state)
         }
         .alert(
-            "Trust SSH Host Key?",
+            state.t.trustHostKeyTitle,
             isPresented: Binding(
                 get: { state.pendingHostKeyPrompt != nil },
                 set: { isPresented in
@@ -61,10 +62,10 @@ struct RootView: View {
             ),
             presenting: state.pendingHostKeyPrompt
         ) { _ in
-            Button("Reject", role: .cancel) {
+            Button(state.t.reject, role: .cancel) {
                 state.rejectPendingHostKey()
             }
-            Button("Trust") {
+            Button(state.t.trust) {
                 state.trustPendingHostKey()
             }
         } message: { prompt in
@@ -89,7 +90,7 @@ struct RootView: View {
             .buttonStyle(.plain)
             .foregroundStyle(state.isSidebarVisible ? .white : .white.opacity(0.54))
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
-            .help("Toggle Connections")
+            .help(state.t.toggleConnections)
 
             Button {
                 state.toggleSFTPDrawer()
@@ -101,23 +102,23 @@ struct RootView: View {
             .buttonStyle(.plain)
             .foregroundStyle(state.isSFTPDrawerVisible ? .white : .white.opacity(0.54))
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
-            .help("Toggle SFTP Drawer")
+            .help(state.t.toggleSFTPDrawer)
 
             Menu {
-                Button("List files") {
+                Button(state.t.listFiles) {
                     state.sendInputToSelectedTab("ls -la\n")
                 }
-                Button("Disk usage") {
+                Button(state.t.diskUsage) {
                     state.sendInputToSelectedTab("df -h\n")
                 }
-                Button("Memory usage") {
+                Button(state.t.memoryUsage) {
                     state.sendInputToSelectedTab("free -h\n")
                 }
-                Button("Process monitor") {
+                Button(state.t.processMonitor) {
                     state.sendInputToSelectedTab("top\n")
                 }
                 Divider()
-                Button("Server status") {
+                Button(state.t.serverStatus) {
                     state.sendInputToSelectedTab("printf '\\n== System ==\\n'; uname -a; printf '\\n== Uptime ==\\n'; uptime; printf '\\n== Disk ==\\n'; df -h; printf '\\n== Memory ==\\n'; free -h 2>/dev/null || vm_stat\\n")
                 }
             } label: {
@@ -128,7 +129,7 @@ struct RootView: View {
             .menuStyle(.borderlessButton)
             .foregroundStyle(.white.opacity(0.86))
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
-            .help("Command Snippets")
+            .help(state.t.commandSnippets)
 
             Button {
                 state.decreaseTerminalFontSize()
@@ -140,7 +141,7 @@ struct RootView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.white.opacity(0.86))
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
-            .help("Smaller Font")
+            .help(state.t.smallerFont)
 
             Button {
                 state.increaseTerminalFontSize()
@@ -152,7 +153,7 @@ struct RootView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.white.opacity(0.86))
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
-            .help("Larger Font")
+            .help(state.t.largerFont)
 
             Spacer(minLength: 0)
         }

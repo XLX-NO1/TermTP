@@ -28,7 +28,7 @@ struct ConnectionSidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("Connections")
+            Text(state.t.connections)
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(.white)
@@ -36,21 +36,21 @@ struct ConnectionSidebarView: View {
             Button {
                 state.beginNewConnection()
             } label: {
-                Label("New Connection", systemImage: "plus")
+                Label(state.t.newConnection, systemImage: "plus")
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            TextField("Search", text: $searchText)
+            TextField(state.t.search, text: $searchText)
                 .textFieldStyle(.roundedBorder)
                 .controlSize(.small)
 
             if searchText.isEmpty {
-                connectionSection("Recent", connections: state.recentConnections, isHistory: false)
+                connectionSection(state.t.recent, connections: state.recentConnections, isHistory: false)
             }
 
-            connectionSection("Favorites", connections: favorites, isHistory: false)
+            connectionSection(state.t.favorites, connections: favorites, isHistory: false)
 
             if searchText.isEmpty {
                 ForEach(state.connectionTags, id: \.self) { tag in
@@ -62,14 +62,14 @@ struct ConnectionSidebarView: View {
                 }
             }
 
-            connectionSection("History", connections: history, isHistory: true)
+            connectionSection(state.t.history, connections: history, isHistory: true)
 
             Spacer(minLength: 0)
 
             Button {
                 state.clearHistory()
             } label: {
-                Text("Clear History")
+                Text(state.t.clearHistory)
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundStyle(.white)
@@ -107,7 +107,7 @@ struct ConnectionSidebarView: View {
                 .textCase(.uppercase)
 
             if connections.isEmpty {
-                Text("No connections")
+                Text(state.t.noConnections)
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.66))
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -123,11 +123,11 @@ struct ConnectionSidebarView: View {
                     }
                     .buttonStyle(.plain)
                     .contextMenu {
-                        Button(connection.isFavorite ? "Remove from Favorites" : "Add to Favorites") {
+                        Button(connection.isFavorite ? state.t.removeFromFavorites : state.t.addToFavorites) {
                             state.toggleFavorite(connection.id)
                         }
 
-                        Button("Delete", role: .destructive) {
+                        Button(state.t.delete, role: .destructive) {
                             if isHistory {
                                 state.deleteHistoryConnection(connection.id)
                             } else {
