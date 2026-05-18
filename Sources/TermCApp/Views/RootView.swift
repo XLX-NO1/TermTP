@@ -147,9 +147,6 @@ struct RootView: View {
                 isFontSizeMenuPresented.toggle()
             } label: {
                 HStack(spacing: 4) {
-                    Image(systemName: "textformat.size")
-                        .font(.system(size: 12, weight: .semibold))
-
                     Text("\(state.terminalFontSize)")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .frame(width: 18, alignment: .trailing)
@@ -158,7 +155,7 @@ struct RootView: View {
                         .font(.system(size: 8, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.62))
                 }
-                .frame(width: 58, height: 22)
+                .frame(width: 42, height: 22)
                 .foregroundStyle(.white)
                 .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 5))
                 .overlay {
