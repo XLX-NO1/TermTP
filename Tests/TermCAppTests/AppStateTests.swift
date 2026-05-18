@@ -8,11 +8,11 @@ import TermCCore
     let state = AppState(connections: [])
 
     #expect(state.terminalFontSizeOptions == TerminalFont.sizeOptions)
-    #expect(state.terminalFontSizeOptions == (9...18).map { $0 })
+    #expect(state.terminalFontSizeOptions == (8...12).map { $0 })
 }
 
 @Test func terminalFontMetricsChangeForEveryAdjacentSize() {
-    let sizes = Array(9...18)
+    let sizes = Array(8...12)
     let metrics = sizes.map { TerminalFont.cellMetrics(for: $0, scale: 2) }
 
     for index in metrics.indices.dropLast() {
@@ -21,10 +21,10 @@ import TermCCore
 }
 
 @Test func terminalFontUsesVisiblePointSizeSteps() {
-    let sizes = Array(9...18)
+    let sizes = Array(8...12)
     let pointSizes = sizes.map(TerminalFont.pointSize)
 
-    #expect(pointSizes.first == 9)
+    #expect(pointSizes.first == 8)
     for index in pointSizes.indices.dropLast() {
         #expect(pointSizes[index + 1] - pointSizes[index] >= 2)
     }

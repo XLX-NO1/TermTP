@@ -1,7 +1,7 @@
 import AppKit
 
 enum TerminalFont {
-    static let sizeOptions = Array(9...18)
+    static let sizeOptions = Array(8...12)
     private static let pointSizeStep: CGFloat = 2
 
     static func make(size: Int) -> NSFont {
