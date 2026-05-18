@@ -19,6 +19,27 @@ final class SFTPServiceTests: XCTestCase {
         XCTAssertFalse(afterDelete.contains { $0.name == "app.tar.gz" })
     }
 
+    func testDownloadTruncatesLocalFileWhenResumeOffsetExceedsRemoteSize() async throws {
+        let service = FakeSFTPService()
+        let session = FakeSSHSession(record: .samplePassword)
+        let localURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("bin")
+        try Data(repeating: 0, count: 8).write(to: localURL)
+        try await service.upload(localPath: "/tmp/remote.bin", remotePath: "/var/www/remote.bin", session: session)
+
+        try await service.download(
+            remotePath: "/var/www/remote.bin",
+            localPath: localURL.path,
+            resumeFrom: 8,
+            progress: { _, _ in },
+            session: session
+        )
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: localURL.path)
+        XCTAssertEqual(attributes[.size] as? Int64, 1)
+    }
+
     func testListOnlyReturnsDirectChildren() async throws {
         let service = FakeSFTPService()
         let session = FakeSSHSession(record: .samplePassword)
@@ -47,6 +68,41 @@ final class SFTPServiceTests: XCTestCase {
 
         do {
             try await service.delete(remotePath: "/var/www/missing.txt", session: session)
+            XCTFail("Expected missing file to throw notFound")
+        } catch let error as SFTPServiceError {
+            XCTAssertEqual(error, .notFound("/var/www/missing.txt"))
+        }
+    }
+
+    func testDeleteDirectoryRemovesFakeDirectory() async throws {
+        let service = FakeSFTPService()
+        let session = FakeSSHSession(record: .samplePassword)
+
+        try await service.makeDirectory(remotePath: "/var/www/releases", session: session)
+        try await service.delete(remotePath: "/var/www/releases", kind: .directory, session: session)
+
+        let files = try await service.list(path: "/var/www", session: session)
+        XCTAssertFalse(files.contains { $0.name == "releases" })
+    }
+
+    func testRenameMovesFakeFileToNewPath() async throws {
+        let service = FakeSFTPService()
+        let session = FakeSSHSession(record: .samplePassword)
+
+        try await service.upload(localPath: "/tmp/old.txt", remotePath: "/var/www/old.txt", session: session)
+        try await service.rename(remotePath: "/var/www/old.txt", to: "/var/www/new.txt", session: session)
+
+        let files = try await service.list(path: "/var/www", session: session)
+        XCTAssertFalse(files.contains { $0.name == "old.txt" })
+        XCTAssertTrue(files.contains { $0.name == "new.txt" && $0.path == "/var/www/new.txt" })
+    }
+
+    func testRenameMissingFileThrowsNotFound() async throws {
+        let service = FakeSFTPService()
+        let session = FakeSSHSession(record: .samplePassword)
+
+        do {
+            try await service.rename(remotePath: "/var/www/missing.txt", to: "/var/www/new.txt", session: session)
             XCTFail("Expected missing file to throw notFound")
         } catch let error as SFTPServiceError {
             XCTAssertEqual(error, .notFound("/var/www/missing.txt"))

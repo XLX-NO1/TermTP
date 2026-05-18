@@ -12,12 +12,20 @@ struct RootView: View {
                     TerminalWorkspaceView(
                         tabs: state.tabs,
                         selectedTabID: $state.selectedTabID,
+                        terminalFontSize: state.terminalFontSize,
+                        pendingCommands: state.pendingTerminalCommands,
                         onSelectTab: { tabID in
                             Task {
                                 await state.selectTab(tabID)
                             }
                         },
-                        onCloseTab: state.closeTab,
+                        onCloseTab: { tabID in
+                            Task {
+                                await state.closeTab(tabID)
+                            }
+                        },
+                        onRenameTab: state.renameTab,
+                        onCommandHandled: state.clearPendingTerminalCommand,
                         onTerminalInput: state.sendInputToSelectedTab
                     )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -94,6 +102,57 @@ struct RootView: View {
             .foregroundStyle(state.isSFTPDrawerVisible ? .white : .white.opacity(0.54))
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
             .help("Toggle SFTP Drawer")
+
+            Menu {
+                Button("List files") {
+                    state.sendInputToSelectedTab("ls -la\n")
+                }
+                Button("Disk usage") {
+                    state.sendInputToSelectedTab("df -h\n")
+                }
+                Button("Memory usage") {
+                    state.sendInputToSelectedTab("free -h\n")
+                }
+                Button("Process monitor") {
+                    state.sendInputToSelectedTab("top\n")
+                }
+                Divider()
+                Button("Server status") {
+                    state.sendInputToSelectedTab("printf '\\n== System ==\\n'; uname -a; printf '\\n== Uptime ==\\n'; uptime; printf '\\n== Disk ==\\n'; df -h; printf '\\n== Memory ==\\n'; free -h 2>/dev/null || vm_stat\\n")
+                }
+            } label: {
+                Image(systemName: "text.badge.plus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 28, height: 22)
+            }
+            .menuStyle(.borderlessButton)
+            .foregroundStyle(.white.opacity(0.86))
+            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
+            .help("Command Snippets")
+
+            Button {
+                state.decreaseTerminalFontSize()
+            } label: {
+                Image(systemName: "textformat.size.smaller")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 28, height: 22)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white.opacity(0.86))
+            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
+            .help("Smaller Font")
+
+            Button {
+                state.increaseTerminalFontSize()
+            } label: {
+                Image(systemName: "textformat.size.larger")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 28, height: 22)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white.opacity(0.86))
+            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
+            .help("Larger Font")
 
             Spacer(minLength: 0)
         }

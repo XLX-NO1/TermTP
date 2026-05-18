@@ -83,6 +83,30 @@ import TermCCore
 }
 
 @MainActor
+@Test func jumpHostConnectionStartsLocalSSHWithoutCitadelPreflight() async {
+    let state = AppState(
+        connections: [],
+        sshClient: FailingSSHClient(),
+        credentialStore: InMemoryCredentialStore(),
+        sftpService: RecordingSFTPService(filesByPath: [:])
+    )
+    state.draftAlias = "Behind Bastion"
+    state.draftHost = "private.example.com"
+    state.draftPort = "22"
+    state.draftUsername = "deploy"
+    state.draftPassword = "secret"
+    state.draftJumpHost = "jump.example.com"
+
+    await state.connectDraftConnection()
+
+    let connection = state.connections[0]
+
+    #expect(state.tabs.last?.state == .connected)
+    #expect(state.tabs.last?.localProcess == .ssh(connection, credential: .password("secret")))
+    #expect(state.remoteFiles.isEmpty)
+}
+
+@MainActor
 @Test func trustedHostKeyIsRememberedForNextConnection() async {
     let state = AppState(connections: [])
     let prompt = HostKeyPrompt(host: "example.com", port: 22, key: "ssh-ed25519 AAAATEST", fingerprint: "SHA256:test")
@@ -244,21 +268,62 @@ import TermCCore
 }
 
 @MainActor
-@Test func closeTabSelectsNeighborAndKeepsAtLeastOneTab() {
+@Test func closeTabSelectsNeighborAndKeepsAtLeastOneTab() async {
     let first = TerminalTab(title: "First", state: .connected, transcript: "")
     let second = TerminalTab(title: "Second", state: .connected, transcript: "")
     let state = AppState(tabs: [first, second], connections: [])
     state.selectedTabID = second.id
 
-    state.closeTab(second.id)
+    await state.closeTab(second.id)
 
     #expect(state.tabs == [first])
     #expect(state.selectedTabID == first.id)
 
-    state.closeTab(first.id)
+    await state.closeTab(first.id)
 
     #expect(state.tabs == [first])
     #expect(state.selectedTabID == first.id)
+}
+
+@MainActor
+@Test func closingSelectedTabRefreshesNeighborRemoteFiles() async {
+    let firstSession = FakeSSHSession(record: .samplePassword)
+    let secondSession = FakeSSHSession(record: ConnectionRecord(
+        alias: "Second",
+        host: "second.example.com",
+        username: "deploy",
+        authentication: .password
+    ))
+    let first = TerminalTab(
+        title: "First",
+        state: .connected,
+        transcript: "",
+        remotePath: "/srv/app",
+        session: firstSession
+    )
+    let second = TerminalTab(
+        title: "Second",
+        state: .connected,
+        transcript: "",
+        remotePath: "/var/log",
+        session: secondSession
+    )
+    let service = FakeSFTPService()
+    let state = AppState(tabs: [first, second], connections: [], sftpService: service)
+    state.selectedTabID = second.id
+    state.remotePath = second.remotePath
+
+    try? await service.makeDirectory(remotePath: "/srv", session: firstSession)
+    try? await service.makeDirectory(remotePath: "/srv/app", session: firstSession)
+    try? await service.upload(localPath: "/tmp/app.txt", remotePath: "/srv/app/app.txt", session: firstSession)
+
+    await state.closeTab(second.id)
+
+    #expect(state.selectedTabID == first.id)
+    #expect(state.remotePath == "/srv/app")
+    #expect(state.remoteFiles == [
+        RemoteFile(name: "app.txt", path: "/srv/app/app.txt", kind: .file, size: 1)
+    ])
 }
 
 @MainActor
@@ -395,6 +460,42 @@ import TermCCore
 }
 
 @MainActor
+@Test func visibleTransfersOnlyIncludesSelectedTabIncompleteTransfers() {
+    let first = TerminalTab(title: "First", state: .connected, transcript: "")
+    let second = TerminalTab(title: "Second", state: .connected, transcript: "")
+    let state = AppState(
+        tabs: [first, second],
+        connections: [],
+        transfers: [
+            TransferRecord(
+                sessionID: first.id,
+                direction: .download,
+                localPath: "/tmp/first.bin",
+                remotePath: "/first.bin",
+                state: .running
+            ),
+            TransferRecord(
+                sessionID: second.id,
+                direction: .download,
+                localPath: "/tmp/second.bin",
+                remotePath: "/second.bin",
+                state: .running
+            ),
+            TransferRecord(
+                sessionID: first.id,
+                direction: .upload,
+                localPath: "/tmp/done.bin",
+                remotePath: "/done.bin",
+                state: .completed
+            )
+        ]
+    )
+    state.selectedTabID = first.id
+
+    #expect(state.visibleTransfers.map(\.remotePath) == ["/first.bin"])
+}
+
+@MainActor
 @Test func downloadFileResumesFromExistingLocalBytesAndTracksProgress() async throws {
     let localURL = FileManager.default.temporaryDirectory
         .appendingPathComponent(UUID().uuidString)
@@ -446,10 +547,126 @@ import TermCCore
     ])
 }
 
+@MainActor
+@Test func createRemoteDirectoryRefreshesCurrentFileList() async {
+    let session = FakeSSHSession(record: .samplePassword)
+    let service = FakeSFTPService()
+    let state = AppState(
+        tabs: [TerminalTab(title: "Connected", state: .connected, transcript: "", session: session)],
+        connections: [],
+        sftpService: service
+    )
+    state.selectedTabID = state.tabs[0].id
+    state.remotePath = "/var/www"
+
+    await state.createRemoteDirectory(named: " releases ")
+
+    #expect(state.remoteFiles.contains {
+        $0 == RemoteFile(name: "releases", path: "/var/www/releases", kind: .directory, size: 0)
+    })
+}
+
+@MainActor
+@Test func createRemoteDirectoryKeepsRefreshPinnedToOriginalTab() async {
+    let firstSession = FakeSSHSession(record: .samplePassword)
+    let secondSession = FakeSSHSession(record: ConnectionRecord(
+        alias: "Second",
+        host: "second.example.com",
+        username: "deploy",
+        authentication: .password
+    ))
+    let first = TerminalTab(
+        title: "First",
+        state: .connected,
+        transcript: "",
+        remotePath: "/var/www",
+        session: firstSession
+    )
+    let second = TerminalTab(
+        title: "Second",
+        state: .connected,
+        transcript: "",
+        remotePath: "/srv",
+        session: secondSession
+    )
+    let service = SlowMutationSFTPService(
+        firstPathFiles: [RemoteFile(name: "releases", path: "/var/www/releases", kind: .directory, size: 0)],
+        secondPathFiles: [RemoteFile(name: "other.txt", path: "/srv/other.txt", kind: .file, size: 1)]
+    )
+    let state = AppState(tabs: [first, second], connections: [], sftpService: service)
+    state.selectedTabID = first.id
+    state.remotePath = first.remotePath
+
+    async let createTask: Void = state.createRemoteDirectory(named: "releases")
+    await service.waitUntilMutationStarted()
+    await state.selectTab(second.id)
+    await service.finishMutation()
+    await createTask
+
+    #expect(state.selectedTabID == second.id)
+    #expect(state.remotePath == "/srv")
+    #expect(state.remoteFiles == [
+        RemoteFile(name: "other.txt", path: "/srv/other.txt", kind: .file, size: 1)
+    ])
+
+    await state.selectTab(first.id)
+
+    #expect(state.remotePath == "/var/www")
+    #expect(state.remoteFiles == [
+        RemoteFile(name: "releases", path: "/var/www/releases", kind: .directory, size: 0)
+    ])
+}
+
+@MainActor
+@Test func renameRemoteFileRefreshesCurrentFileList() async {
+    let session = FakeSSHSession(record: .samplePassword)
+    let service = FakeSFTPService()
+    let state = AppState(
+        tabs: [TerminalTab(title: "Connected", state: .connected, transcript: "", session: session)],
+        connections: [],
+        sftpService: service
+    )
+    state.selectedTabID = state.tabs[0].id
+    state.remotePath = "/var/www"
+    try? await service.upload(localPath: "/tmp/old.txt", remotePath: "/var/www/old.txt", session: session)
+
+    await state.renameRemoteFile(
+        RemoteFile(name: "old.txt", path: "/var/www/old.txt", kind: .file, size: 1),
+        to: "new.txt"
+    )
+
+    #expect(state.remoteFiles.contains { $0.name == "new.txt" })
+    #expect(!state.remoteFiles.contains { $0.name == "old.txt" })
+}
+
+@MainActor
+@Test func deleteRemoteFileRefreshesCurrentFileList() async {
+    let session = FakeSSHSession(record: .samplePassword)
+    let service = FakeSFTPService()
+    let state = AppState(
+        tabs: [TerminalTab(title: "Connected", state: .connected, transcript: "", session: session)],
+        connections: [],
+        sftpService: service
+    )
+    state.selectedTabID = state.tabs[0].id
+    state.remotePath = "/var/www"
+    try? await service.upload(localPath: "/tmp/delete.txt", remotePath: "/var/www/delete.txt", session: session)
+
+    await state.deleteRemoteFile(RemoteFile(name: "delete.txt", path: "/var/www/delete.txt", kind: .file, size: 1))
+
+    #expect(!state.remoteFiles.contains { $0.name == "delete.txt" })
+}
+
 private struct HangingSSHClient: SSHClientProviding {
     func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
         try await Task.sleep(for: .seconds(60))
         return FakeSSHSession(record: record)
+    }
+}
+
+private struct FailingSSHClient: SSHClientProviding {
+    func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
+        throw SSHConnectionTimeoutError(seconds: 0)
     }
 }
 
@@ -480,7 +697,72 @@ private actor RecordingSFTPService: SFTPServicing {
 
     func makeDirectory(remotePath: String, session: SSHSessionProviding) async throws {}
 
-    func delete(remotePath: String, session: SSHSessionProviding) async throws {}
+    func delete(remotePath: String, kind: RemoteFile.Kind, session: SSHSessionProviding) async throws {}
+
+    func rename(remotePath: String, to newRemotePath: String, session: SSHSessionProviding) async throws {}
+}
+
+private actor SlowMutationSFTPService: SFTPServicing {
+    private let firstPathFiles: [RemoteFile]
+    private let secondPathFiles: [RemoteFile]
+    private var mutationStarted: CheckedContinuation<Void, Never>?
+    private var mutationCanFinish: CheckedContinuation<Void, Never>?
+    private var hasStartedMutation = false
+
+    init(firstPathFiles: [RemoteFile], secondPathFiles: [RemoteFile]) {
+        self.firstPathFiles = firstPathFiles
+        self.secondPathFiles = secondPathFiles
+    }
+
+    func waitUntilMutationStarted() async {
+        if hasStartedMutation {
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            mutationStarted = continuation
+        }
+    }
+
+    func finishMutation() {
+        mutationCanFinish?.resume()
+        mutationCanFinish = nil
+    }
+
+    func list(path: String, session: SSHSessionProviding) async throws -> [RemoteFile] {
+        if path == "/var/www" {
+            return firstPathFiles
+        }
+        if path == "/srv" {
+            return secondPathFiles
+        }
+        return []
+    }
+
+    func upload(localPath: String, remotePath: String, session: SSHSessionProviding) async throws {}
+
+    func download(remotePath: String, localPath: String, session: SSHSessionProviding) async throws {}
+
+    func download(
+        remotePath: String,
+        localPath: String,
+        resumeFrom offset: Int64,
+        progress: @escaping ProgressHandler,
+        session: SSHSessionProviding
+    ) async throws {}
+
+    func makeDirectory(remotePath: String, session: SSHSessionProviding) async throws {
+        hasStartedMutation = true
+        mutationStarted?.resume()
+        mutationStarted = nil
+        await withCheckedContinuation { continuation in
+            mutationCanFinish = continuation
+        }
+    }
+
+    func delete(remotePath: String, kind: RemoteFile.Kind, session: SSHSessionProviding) async throws {}
+
+    func rename(remotePath: String, to newRemotePath: String, session: SSHSessionProviding) async throws {}
 }
 
 private actor ProgressRecordingSFTPService: SFTPServicing {
@@ -509,7 +791,9 @@ private actor ProgressRecordingSFTPService: SFTPServicing {
 
     func makeDirectory(remotePath: String, session: SSHSessionProviding) async throws {}
 
-    func delete(remotePath: String, session: SSHSessionProviding) async throws {}
+    func delete(remotePath: String, kind: RemoteFile.Kind, session: SSHSessionProviding) async throws {}
+
+    func rename(remotePath: String, to newRemotePath: String, session: SSHSessionProviding) async throws {}
 }
 
 @Test func welcomeTabUsesTermTPBrandName() {

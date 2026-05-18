@@ -6,6 +6,9 @@ import TermCCore
 struct LocalSSHTerminalView: NSViewRepresentable {
     let connection: ConnectionRecord
     let credential: Credential?
+    var fontSize: Double = 11
+    var pendingCommand: TerminalCommand?
+    var onCommandHandled: (TerminalCommand.ID) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -20,17 +23,20 @@ struct LocalSSHTerminalView: NSViewRepresentable {
 
     func updateNSView(_ terminalView: LocalProcessTerminalView, context: Context) {
         configure(terminalView)
+        context.coordinator.onCommandHandled = onCommandHandled
         guard context.coordinator.startedConnectionID != connection.id else {
+            context.coordinator.sendPendingCommandIfNeeded(pendingCommand, to: terminalView)
             return
         }
 
         terminalView.terminate()
         startSSH(in: terminalView, context: context)
+        context.coordinator.sendPendingCommandIfNeeded(pendingCommand, to: terminalView)
     }
 
     private func configure(_ terminalView: LocalProcessTerminalView) {
         terminalView.autoresizingMask = [.width, .height]
-        terminalView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        terminalView.font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
         terminalView.nativeBackgroundColor = .black
         terminalView.nativeForegroundColor = NSColor(
             calibratedRed: 0.45,
@@ -45,12 +51,31 @@ struct LocalSSHTerminalView: NSViewRepresentable {
 
     private func startSSH(in terminalView: LocalProcessTerminalView, context: Context) {
         context.coordinator.startedConnectionID = connection.id
-        let launch = Self.launchConfiguration(for: connection, credential: credential)
+        context.coordinator.removeAskPassScript()
+        let askPassScriptPath = Self.needsAskPassScript(for: credential)
+            ? Self.makeAskPassScriptPath()
+            : nil
+        context.coordinator.askPassScriptPath = askPassScriptPath
+        let launch = Self.launchConfiguration(
+            for: connection,
+            credential: credential,
+            askPassScriptPath: askPassScriptPath
+        )
         terminalView.startProcess(
             executable: launch.executable,
             args: launch.args,
             environment: launch.environment
         )
+        context.coordinator.onCommandHandled = onCommandHandled
+        context.coordinator.lastSentCommandID = nil
+    }
+
+    private static func needsAskPassScript(for credential: Credential?) -> Bool {
+        guard case .password(let password) = credential else {
+            return false
+        }
+
+        return !password.isEmpty
     }
 
     struct LaunchConfiguration {
@@ -61,7 +86,8 @@ struct LocalSSHTerminalView: NSViewRepresentable {
 
     static func launchConfiguration(
         for connection: ConnectionRecord,
-        credential: Credential?
+        credential: Credential?,
+        askPassScriptPath: String? = nil
     ) -> LaunchConfiguration {
         guard
             case .password(let password) = credential,
@@ -79,7 +105,7 @@ struct LocalSSHTerminalView: NSViewRepresentable {
             args: sshArguments(for: connection),
             environment: terminalEnvironment(additionalValues: [
                 "TERMTP_SSH_PASSWORD": password,
-                "SSH_ASKPASS": askPassScriptPath(),
+                "SSH_ASKPASS": askPassScriptPath ?? makeAskPassScriptPath(),
                 "SSH_ASKPASS_REQUIRE": "force",
                 "DISPLAY": "termtp:0"
             ])
@@ -105,9 +131,14 @@ struct LocalSSHTerminalView: NSViewRepresentable {
             .map { "\($0.key)=\($0.value)" }
     }
 
-    private static func askPassScriptPath() -> String {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("termtp-ssh-askpass.sh")
+    static func makeAskPassScriptPath() -> String {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("termtp-askpass-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        let url = directory.appendingPathComponent("ssh-askpass.sh")
         let script = """
         #!/bin/sh
         printf '%s\\n' "$TERMTP_SSH_PASSWORD"
@@ -152,10 +183,92 @@ struct LocalSSHTerminalView: NSViewRepresentable {
             args.insert(contentsOf: ["-i", privateKeyPath], at: 0)
         }
 
+        if connection.keepAlive.isEnabled {
+            args.insert(contentsOf: [
+                "-o", "ServerAliveInterval=\(connection.keepAlive.intervalSeconds)",
+                "-o", "ServerAliveCountMax=\(connection.keepAlive.maxCount)"
+            ], at: 0)
+        }
+
+        if let jumpHost = connection.jumpHost, !jumpHost.isEmpty {
+            args.insert(contentsOf: ["-J", jumpHost], at: 0)
+        }
+
+        for forward in connection.portForwards.reversed() {
+            args.insert(contentsOf: sshArguments(for: forward), at: 0)
+        }
+
         return args
+    }
+
+    private static func sshArguments(for forward: ConnectionRecord.PortForward) -> [String] {
+        switch forward.direction {
+        case .local:
+            let bind = forward.bindAddress.isEmpty ? "" : "\(forward.bindAddress):"
+            return [
+                "-L",
+                "\(bind)\(forward.localPort):\(forward.destinationHost):\(forward.destinationPort)"
+            ]
+        case .remote:
+            let bind = forward.bindAddress.isEmpty ? "" : "\(forward.bindAddress):"
+            return [
+                "-R",
+                "\(bind)\(forward.localPort):\(forward.destinationHost):\(forward.destinationPort)"
+            ]
+        case .dynamic:
+            let bind = forward.bindAddress.isEmpty ? "" : "\(forward.bindAddress):"
+            return ["-D", "\(bind)\(forward.localPort)"]
+        }
     }
 
     final class Coordinator {
         var startedConnectionID: ConnectionRecord.ID?
+        var askPassScriptPath: String?
+        var lastSentCommandID: TerminalCommand.ID?
+        var onCommandHandled: (TerminalCommand.ID) -> Void = { _ in }
+
+        deinit {
+            removeAskPassScript()
+        }
+
+        func removeAskPassScript() {
+            guard let askPassScriptPath else {
+                return
+            }
+
+            let scriptURL = URL(fileURLWithPath: askPassScriptPath)
+            try? FileManager.default.removeItem(at: scriptURL.deletingLastPathComponent())
+            self.askPassScriptPath = nil
+        }
+
+        @MainActor
+        func sendPendingCommandIfNeeded(
+            _ command: TerminalCommand?,
+            to terminalView: LocalProcessTerminalView
+        ) {
+            guard
+                let command,
+                lastSentCommandID != command.id
+            else {
+                return
+            }
+
+            let bytes = Array(command.text.utf8)
+            lastSentCommandID = command.id
+            terminalView.process.send(data: bytes[...])
+            onCommandHandled(command.id)
+        }
+    }
+}
+
+extension LocalSSHTerminalView {
+    func pendingCommand(
+        _ command: TerminalCommand?,
+        onHandled: @escaping (TerminalCommand.ID) -> Void
+    ) -> LocalSSHTerminalView {
+        var view = self
+        view.pendingCommand = command
+        view.onCommandHandled = onHandled
+        return view
     }
 }

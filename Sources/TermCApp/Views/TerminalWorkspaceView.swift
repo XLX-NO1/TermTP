@@ -4,9 +4,20 @@ import TermCCore
 struct TerminalWorkspaceView: View {
     let tabs: [TerminalTab]
     @Binding var selectedTabID: TerminalTab.ID?
+    var terminalFontSize: Double = 11
+    var pendingCommands: [TerminalTab.ID: TerminalCommand] = [:]
     var onSelectTab: (TerminalTab.ID) -> Void = { _ in }
     var onCloseTab: (TerminalTab.ID) -> Void = { _ in }
+    var onRenameTab: (TerminalTab.ID, String) -> Void = { _, _ in }
+    var onCommandHandled: (TerminalTab.ID, TerminalCommand.ID) -> Void = { _, _ in }
     var onTerminalInput: (String) -> Void = { _ in }
+    @State private var tabRenameTarget: TabRenameTarget?
+    @State private var tabRenameTitle = ""
+
+    private struct TabRenameTarget: Identifiable {
+        var id: TerminalTab.ID
+        var title: String
+    }
 
     private var selectedTab: TerminalTab? {
         tabs.first { $0.id == selectedTabID } ?? tabs.first
@@ -19,6 +30,32 @@ struct TerminalWorkspaceView: View {
             terminalStack
         }
         .background(Color.black)
+        .sheet(item: $tabRenameTarget) { tab in
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Rename Tab")
+                    .font(.headline)
+
+                TextField("Title", text: $tabRenameTitle)
+                    .textFieldStyle(.roundedBorder)
+
+                HStack {
+                    Spacer()
+
+                    Button("Cancel", role: .cancel) {
+                        tabRenameTarget = nil
+                    }
+
+                    Button("OK") {
+                        onRenameTab(tab.id, tabRenameTitle)
+                        tabRenameTarget = nil
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(tabRenameTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding(20)
+            .frame(width: 300)
+        }
     }
 
     private var terminalStack: some View {
@@ -35,10 +72,14 @@ struct TerminalWorkspaceView: View {
     @ViewBuilder
     private func terminalContent(for tab: TerminalTab) -> some View {
         if case .ssh(let connection, let credential) = tab.localProcess {
-            LocalSSHTerminalView(connection: connection, credential: credential)
+            LocalSSHTerminalView(connection: connection, credential: credential, fontSize: terminalFontSize)
+                .pendingCommand(pendingCommands[tab.id]) { commandID in
+                    onCommandHandled(tab.id, commandID)
+                }
         } else {
             TerminalView(
                 transcript: tab.transcript,
+                fontSize: terminalFontSize,
                 onInput: onTerminalInput
             )
         }
@@ -69,6 +110,11 @@ struct TerminalWorkspaceView: View {
                 }
                 .buttonStyle(.plain)
                 .contextMenu {
+                    Button("Rename") {
+                        tabRenameTitle = tab.title
+                        tabRenameTarget = TabRenameTarget(id: tab.id, title: tab.title)
+                    }
+
                     Button("Close") {
                         onCloseTab(tab.id)
                     }

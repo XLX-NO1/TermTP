@@ -5,6 +5,31 @@ struct SFTPDrawerView: View {
     @Bindable var state: AppState
     @State private var selectedRemoteFile: RemoteFile?
     @State private var pathInput = ""
+    @State private var namePrompt: NamePrompt?
+    @State private var pendingName = ""
+
+    private enum NamePrompt: Identifiable {
+        case createDirectory
+        case rename(RemoteFile)
+
+        var id: String {
+            switch self {
+            case .createDirectory:
+                return "createDirectory"
+            case .rename(let file):
+                return "rename-\(file.id)"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .createDirectory:
+                return "New Folder"
+            case .rename:
+                return "Rename"
+            }
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -67,6 +92,10 @@ struct SFTPDrawerView: View {
                             chooseUploadFile()
                         }
 
+                        Button("New Folder") {
+                            showCreateDirectoryPrompt()
+                        }
+
                         Button("Refresh") {
                             Task {
                                 await state.refreshRemoteFiles()
@@ -87,6 +116,10 @@ struct SFTPDrawerView: View {
                         chooseUploadFile()
                     }
 
+                    Button("New Folder") {
+                        showCreateDirectoryPrompt()
+                    }
+
                     Button("Refresh") {
                         Task {
                             await state.refreshRemoteFiles()
@@ -97,7 +130,7 @@ struct SFTPDrawerView: View {
 
             Spacer(minLength: 0)
 
-            if !visibleTransfers.isEmpty {
+            if !state.visibleTransfers.isEmpty {
                 transferList
             }
         }
@@ -107,6 +140,10 @@ struct SFTPDrawerView: View {
         .contextMenu {
             Button("Upload Here") {
                 chooseUploadFile()
+            }
+
+            Button("New Folder") {
+                showCreateDirectoryPrompt()
             }
 
             Button("Refresh") {
@@ -120,11 +157,36 @@ struct SFTPDrawerView: View {
                 .fill(Color.white.opacity(0.08))
                 .frame(height: 1)
         }
+        .sheet(item: $namePrompt) { prompt in
+            VStack(alignment: .leading, spacing: 14) {
+                Text(prompt.title)
+                    .font(.headline)
+
+                TextField("Name", text: $pendingName)
+                    .textFieldStyle(.roundedBorder)
+
+                HStack {
+                    Spacer()
+
+                    Button("Cancel", role: .cancel) {
+                        namePrompt = nil
+                    }
+
+                    Button("OK") {
+                        submitNamePrompt(prompt)
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(pendingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding(20)
+            .frame(width: 320)
+        }
     }
 
     private var transferList: some View {
         VStack(alignment: .leading, spacing: 5) {
-            ForEach(visibleTransfers.suffix(3)) { transfer in
+            ForEach(state.visibleTransfers.suffix(3)) { transfer in
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Image(systemName: transfer.direction == .download ? "arrow.down.circle" : "arrow.up.circle")
@@ -148,10 +210,6 @@ struct SFTPDrawerView: View {
                 }
             }
         }
-    }
-
-    private var visibleTransfers: [TransferRecord] {
-        state.transfers.filter { $0.state != .completed }
     }
 
     private func fileRow(_ file: RemoteFile) -> some View {
@@ -203,6 +261,39 @@ struct SFTPDrawerView: View {
                 Button("Download") {
                     chooseDownloadLocation(for: file)
                 }
+            }
+
+            Button("Rename") {
+                showRenamePrompt(for: file)
+            }
+
+            Button("Delete", role: .destructive) {
+                Task {
+                    await state.deleteRemoteFile(file)
+                }
+            }
+        }
+    }
+
+    private func showCreateDirectoryPrompt() {
+        pendingName = ""
+        namePrompt = .createDirectory
+    }
+
+    private func showRenamePrompt(for file: RemoteFile) {
+        pendingName = file.name
+        namePrompt = .rename(file)
+    }
+
+    private func submitNamePrompt(_ prompt: NamePrompt) {
+        let name = pendingName
+        namePrompt = nil
+        Task {
+            switch prompt {
+            case .createDirectory:
+                await state.createRemoteDirectory(named: name)
+            case .rename(let file):
+                await state.renameRemoteFile(file, to: name)
             }
         }
     }

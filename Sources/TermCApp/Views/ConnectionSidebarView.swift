@@ -14,6 +14,7 @@ struct ConnectionSidebarView: View {
             connection.alias.localizedCaseInsensitiveContains(searchText)
                 || connection.host.localizedCaseInsensitiveContains(searchText)
                 || connection.username.localizedCaseInsensitiveContains(searchText)
+                || connection.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
         }
     }
 
@@ -45,7 +46,21 @@ struct ConnectionSidebarView: View {
                 .textFieldStyle(.roundedBorder)
                 .controlSize(.small)
 
+            if searchText.isEmpty {
+                connectionSection("Recent", connections: state.recentConnections, isHistory: false)
+            }
+
             connectionSection("Favorites", connections: favorites, isHistory: false)
+
+            if searchText.isEmpty {
+                ForEach(state.connectionTags, id: \.self) { tag in
+                    connectionSection(
+                        "#\(tag)",
+                        connections: state.connections.filter { $0.tags.contains(tag) },
+                        isHistory: false
+                    )
+                }
+            }
 
             connectionSection("History", connections: history, isHistory: true)
 
@@ -141,6 +156,13 @@ private struct ConnectionRow: View {
                 .font(.caption2)
                 .foregroundStyle(.white.opacity(0.68))
                 .lineLimit(1)
+
+            if !connection.tags.isEmpty {
+                Text(connection.tags.map { "#\($0)" }.joined(separator: " "))
+                    .font(.caption2)
+                    .foregroundStyle(Color.green.opacity(0.72))
+                    .lineLimit(1)
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
