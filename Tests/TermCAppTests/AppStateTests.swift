@@ -617,10 +617,14 @@ import TermCCore
 @Test func retryFailedDownloadClearsErrorAndCompletesTransfer() async throws {
     let session = FakeSSHSession(record: .samplePassword)
     let tab = TerminalTab(title: "Shell", state: .connected, transcript: "", session: session)
+    let localPath = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension("log")
+        .path
     let transfer = TransferRecord(
         sessionID: tab.id,
         direction: .download,
-        localPath: "/tmp/retry.log",
+        localPath: localPath,
         remotePath: "/var/log/retry.log",
         state: .failed,
         errorMessage: "Network lost"
@@ -658,10 +662,14 @@ import TermCCore
     let secondSession = FakeSSHSession(record: secondRecord)
     let first = TerminalTab(title: "First", state: .connected, transcript: "", session: firstSession)
     let second = TerminalTab(title: "Second", state: .connected, transcript: "", session: secondSession)
+    let localPath = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension("log")
+        .path
     let transfer = TransferRecord(
         sessionID: first.id,
         direction: .download,
-        localPath: "/tmp/retry.log",
+        localPath: localPath,
         remotePath: "/var/log/retry.log",
         state: .failed,
         errorMessage: "Network lost"
@@ -842,10 +850,11 @@ import TermCCore
 
 @MainActor
 @Test func downloadFileResumesFromExistingLocalBytesAndTracksProgress() async throws {
-    let localURL = FileManager.default.temporaryDirectory
+    let finalURL = FileManager.default.temporaryDirectory
         .appendingPathComponent(UUID().uuidString)
         .appendingPathExtension("bin")
-    try Data(repeating: 0, count: 3).write(to: localURL)
+    let partialURL = URL(fileURLWithPath: finalURL.path + ".termtp-download")
+    try Data(repeating: 0, count: 3).write(to: partialURL)
     let state = AppState(
         tabs: [TerminalTab(
             title: "Connected",
@@ -860,13 +869,45 @@ import TermCCore
 
     await state.downloadFile(
         remoteFile: RemoteFile(name: "archive.tgz", path: "/tmp/archive.tgz", kind: .file, size: 10),
-        localPath: localURL.path
+        localPath: finalURL.path
     )
 
     #expect(state.transfers.count == 1)
     #expect(state.transfers[0].bytesCompleted == 10)
     #expect(state.transfers[0].totalBytes == 10)
     #expect(state.transfers[0].state == .completed)
+    #expect(FileManager.default.fileExists(atPath: finalURL.path))
+    #expect(!FileManager.default.fileExists(atPath: partialURL.path))
+}
+
+@MainActor
+@Test func downloadFileOverwritesExistingFinalFileInsteadOfTreatingItAsCompleteResume() async throws {
+    let finalURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension("bin")
+    try Data("old-content".utf8).write(to: finalURL)
+    let service = ProgressRecordingSFTPService(totalBytes: 10)
+    let state = AppState(
+        tabs: [TerminalTab(
+            title: "Connected",
+            state: .connected,
+            transcript: "",
+            session: FakeSSHSession(record: .samplePassword)
+        )],
+        connections: [],
+        sftpService: service
+    )
+    state.selectedTabID = state.tabs[0].id
+
+    await state.downloadFile(
+        remoteFile: RemoteFile(name: "archive.tgz", path: "/tmp/archive.tgz", kind: .file, size: 10),
+        localPath: finalURL.path
+    )
+
+    #expect(await service.resumeOffsets == [0])
+    #expect(state.transfers.first?.bytesCompleted == 10)
+    #expect(try Data(contentsOf: finalURL).count == 10)
+    #expect(try Data(contentsOf: finalURL) != Data("old-content".utf8))
 }
 
 @MainActor
@@ -1123,6 +1164,7 @@ private actor SessionRecordingSFTPService: SFTPServicing {
         session: SSHSessionProviding
     ) async throws {
         downloadHosts.append(session.record.host)
+        writeFakeDownload(to: localPath, offset: offset, totalBytes: 1)
         await progress(1, 1)
     }
 
@@ -1206,6 +1248,7 @@ private actor SlowMutationSFTPService: SFTPServicing {
 
 private actor ProgressRecordingSFTPService: SFTPServicing {
     private let totalBytes: Int64
+    private(set) var resumeOffsets: [Int64] = []
 
     init(totalBytes: Int64) {
         self.totalBytes = totalBytes
@@ -1224,6 +1267,8 @@ private actor ProgressRecordingSFTPService: SFTPServicing {
         progress: @escaping ProgressHandler,
         session: SSHSessionProviding
     ) async throws {
+        resumeOffsets.append(offset)
+        writeFakeDownload(to: localPath, offset: offset, totalBytes: totalBytes)
         await progress(offset, totalBytes)
         await progress(totalBytes, totalBytes)
     }
@@ -1259,6 +1304,7 @@ private actor RetrySFTPService: SFTPServicing {
         progress: @escaping ProgressHandler,
         session: SSHSessionProviding
     ) async throws {
+        writeFakeDownload(to: localPath, offset: offset, totalBytes: totalBytes)
         await progress(totalBytes, totalBytes)
     }
 
@@ -1271,6 +1317,29 @@ private actor RetrySFTPService: SFTPServicing {
     func previewText(remotePath: String, byteLimit: Int, session: SSHSessionProviding) async throws -> String { "" }
 
     func changePermissions(remotePath: String, permissions: UInt32, session: SSHSessionProviding) async throws {}
+}
+
+private func writeFakeDownload(to path: String, offset: Int64, totalBytes: Int64) {
+    let url = URL(fileURLWithPath: path)
+    try? FileManager.default.createDirectory(
+        at: url.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    FileManager.default.createFile(atPath: path, contents: nil)
+    guard let output = try? FileHandle(forWritingTo: url) else {
+        return
+    }
+    defer {
+        try? output.close()
+    }
+
+    do {
+        try output.seekToEnd()
+    } catch {
+        return
+    }
+    let remainingBytes = max(0, totalBytes - offset)
+    try? output.write(contentsOf: Data(repeating: 0, count: Int(remainingBytes)))
 }
 
 @Test func welcomeTabUsesChineseTermTPBrandName() {

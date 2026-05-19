@@ -146,6 +146,7 @@ public struct CitadelSFTPService: SFTPServicing {
             ) { file in
                 var offset: UInt64 = 0
                 while true {
+                    try Task.checkCancellation()
                     let data = try input.read(upToCount: 256 * 1024) ?? Data()
                     guard !data.isEmpty else {
                         break
@@ -153,6 +154,7 @@ public struct CitadelSFTPService: SFTPServicing {
 
                     try await file.write(ByteBuffer(data: data), at: offset)
                     offset += UInt64(data.count)
+                    try Task.checkCancellation()
                 }
             }
         }
@@ -188,6 +190,7 @@ public struct CitadelSFTPService: SFTPServicing {
                 await progress(currentOffset, totalBytes)
 
                 while currentOffset < totalBytes {
+                    try Task.checkCancellation()
                     var buffer = try await file.read(
                         from: UInt64(currentOffset),
                         length: UInt32(min(256 * 1024, totalBytes - currentOffset))
@@ -200,6 +203,7 @@ public struct CitadelSFTPService: SFTPServicing {
                     try output.write(contentsOf: data)
                     currentOffset += Int64(data.count)
                     await progress(currentOffset, totalBytes)
+                    try Task.checkCancellation()
                 }
             }
         }

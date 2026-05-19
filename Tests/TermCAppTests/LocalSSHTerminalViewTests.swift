@@ -9,25 +9,38 @@ import TermCCore
     let launch = LocalSSHTerminalView.launchConfiguration(
         for: ConnectionRecord.samplePassword,
         credential: Credential.password("secret"),
-        askPassScriptPath: askPassScriptPath
+        askPass: .init(
+            directoryPath: "/tmp/termtp-test-askpass",
+            scriptPath: askPassScriptPath,
+            passwordFilePath: "/tmp/termtp-test-askpass/password"
+        )
     )
 
     #expect(launch.environment?.contains("TERM=xterm-256color") == true)
     #expect(launch.environment?.contains("SSH_ASKPASS_REQUIRE=force") == true)
     #expect(launch.environment?.contains("SSH_ASKPASS=\(askPassScriptPath)") == true)
+    #expect(launch.environment?.contains("TERMTP_SSH_PASSWORD=secret") == false)
+    #expect(launch.environment?.contains("TERMTP_SSH_PASSWORD_FILE=/tmp/termtp-test-askpass/password") == true)
 }
 
 @MainActor
-@Test func askPassScriptUsesIsolatedTemporaryDirectory() {
-    let firstPath = LocalSSHTerminalView.makeAskPassScriptPath()
-    let secondPath = LocalSSHTerminalView.makeAskPassScriptPath()
+@Test func askPassBundleUsesIsolatedTemporaryDirectoryAndRestrictedPasswordFile() throws {
+    let first = LocalSSHTerminalView.makeAskPassBundle(password: "first-secret")
+    let second = LocalSSHTerminalView.makeAskPassBundle(password: "second-secret")
 
-    #expect(firstPath != secondPath)
-    #expect(URL(fileURLWithPath: firstPath).lastPathComponent == "ssh-askpass.sh")
-    #expect(FileManager.default.isExecutableFile(atPath: firstPath))
+    #expect(first.scriptPath != second.scriptPath)
+    #expect(URL(fileURLWithPath: first.scriptPath).lastPathComponent == "ssh-askpass.sh")
+    #expect(URL(fileURLWithPath: first.passwordFilePath).lastPathComponent == "password")
+    #expect(FileManager.default.isExecutableFile(atPath: first.scriptPath))
+    #expect(try String(contentsOfFile: first.passwordFilePath, encoding: .utf8) == "first-secret")
 
-    try? FileManager.default.removeItem(at: URL(fileURLWithPath: firstPath).deletingLastPathComponent())
-    try? FileManager.default.removeItem(at: URL(fileURLWithPath: secondPath).deletingLastPathComponent())
+    let scriptPermissions = try FileManager.default.attributesOfItem(atPath: first.scriptPath)[.posixPermissions] as? Int
+    let passwordPermissions = try FileManager.default.attributesOfItem(atPath: first.passwordFilePath)[.posixPermissions] as? Int
+    #expect(scriptPermissions == 0o700)
+    #expect(passwordPermissions == 0o600)
+
+    try? FileManager.default.removeItem(atPath: first.directoryPath)
+    try? FileManager.default.removeItem(atPath: second.directoryPath)
 }
 
 @MainActor

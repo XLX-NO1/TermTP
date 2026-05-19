@@ -63,14 +63,12 @@ struct LocalSSHTerminalView: NSViewRepresentable {
     private func startSSH(in terminalView: LocalProcessTerminalView, context: Context) {
         context.coordinator.startedConnectionID = connection.id
         context.coordinator.removeAskPassScript()
-        let askPassScriptPath = Self.needsAskPassScript(for: credential)
-            ? Self.makeAskPassScriptPath()
-            : nil
-        context.coordinator.askPassScriptPath = askPassScriptPath
+        let askPass = Self.password(from: credential).map(Self.makeAskPassBundle)
+        context.coordinator.askPassDirectoryPath = askPass?.directoryPath
         let launch = Self.launchConfiguration(
             for: connection,
             credential: credential,
-            askPassScriptPath: askPassScriptPath
+            askPass: askPass
         )
         terminalView.startProcess(
             executable: launch.executable,
@@ -81,12 +79,25 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         context.coordinator.lastSentCommandID = nil
     }
 
-    private static func needsAskPassScript(for credential: Credential?) -> Bool {
-        guard case .password(let password) = credential else {
-            return false
+    private static func password(from credential: Credential?) -> String? {
+        guard
+            case .password(let password) = credential,
+            !password.isEmpty
+        else {
+            return nil
         }
 
-        return !password.isEmpty
+        return password
+    }
+
+    private static func needsAskPassScript(for credential: Credential?) -> Bool {
+        password(from: credential) != nil
+    }
+
+    struct AskPassBundle {
+        var directoryPath: String
+        var scriptPath: String
+        var passwordFilePath: String
     }
 
     nonisolated static func needsMultilinePasteConfirmation(_ text: String) -> Bool {
@@ -107,12 +118,9 @@ struct LocalSSHTerminalView: NSViewRepresentable {
     static func launchConfiguration(
         for connection: ConnectionRecord,
         credential: Credential?,
-        askPassScriptPath: String? = nil
+        askPass: AskPassBundle? = nil
     ) -> LaunchConfiguration {
-        guard
-            case .password(let password) = credential,
-            !password.isEmpty
-        else {
+        guard needsAskPassScript(for: credential) else {
             return LaunchConfiguration(
                 executable: "/usr/bin/ssh",
                 args: sshArguments(for: connection),
@@ -120,12 +128,13 @@ struct LocalSSHTerminalView: NSViewRepresentable {
             )
         }
 
+        let askPass = askPass ?? makeAskPassBundle(password: password(from: credential) ?? "")
         return LaunchConfiguration(
             executable: "/usr/bin/ssh",
             args: sshArguments(for: connection),
             environment: terminalEnvironment(additionalValues: [
-                "TERMTP_SSH_PASSWORD": password,
-                "SSH_ASKPASS": askPassScriptPath ?? makeAskPassScriptPath(),
+                "TERMTP_SSH_PASSWORD_FILE": askPass.passwordFilePath,
+                "SSH_ASKPASS": askPass.scriptPath,
                 "SSH_ASKPASS_REQUIRE": "force",
                 "DISPLAY": "termtp:0"
             ])
@@ -151,25 +160,40 @@ struct LocalSSHTerminalView: NSViewRepresentable {
             .map { "\($0.key)=\($0.value)" }
     }
 
-    static func makeAskPassScriptPath() -> String {
+    static func makeAskPassBundle(password: String) -> AskPassBundle {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("termtp-askpass-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(
             at: directory,
             withIntermediateDirectories: true
         )
-        let url = directory.appendingPathComponent("ssh-askpass.sh")
-        let script = """
-        #!/bin/sh
-        printf '%s\\n' "$TERMTP_SSH_PASSWORD"
-        """
-
-        try? script.write(to: url, atomically: true, encoding: .utf8)
         try? FileManager.default.setAttributes(
             [.posixPermissions: 0o700],
-            ofItemAtPath: url.path
+            ofItemAtPath: directory.path
         )
-        return url.path
+        let scriptURL = directory.appendingPathComponent("ssh-askpass.sh")
+        let passwordURL = directory.appendingPathComponent("password")
+        let script = """
+        #!/bin/sh
+        IFS= read -r password < "$TERMTP_SSH_PASSWORD_FILE"
+        printf '%s\\n' "$password"
+        """
+
+        try? password.write(to: passwordURL, atomically: true, encoding: .utf8)
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: passwordURL.path
+        )
+        try? script.write(to: scriptURL, atomically: true, encoding: .utf8)
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: scriptURL.path
+        )
+        return AskPassBundle(
+            directoryPath: directory.path,
+            scriptPath: scriptURL.path,
+            passwordFilePath: passwordURL.path
+        )
     }
 
     private func terminalContextMenu(for terminalView: LocalProcessTerminalView, strings: AppStrings) -> NSMenu {
@@ -190,6 +214,11 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         pasteItem.target = terminalView
         menu.addItem(pasteItem)
         return menu
+    }
+
+    @available(*, unavailable, renamed: "makeAskPassBundle(password:)")
+    static func makeAskPassScriptPath() -> String {
+        makeAskPassBundle(password: "").scriptPath
     }
 
     private static func sshArguments(for connection: ConnectionRecord) -> [String] {
@@ -243,7 +272,7 @@ struct LocalSSHTerminalView: NSViewRepresentable {
 
     final class Coordinator {
         var startedConnectionID: ConnectionRecord.ID?
-        var askPassScriptPath: String?
+        var askPassDirectoryPath: String?
         var lastSentCommandID: TerminalCommand.ID?
         var onCommandHandled: (TerminalCommand.ID) -> Void = { _ in }
 
@@ -252,13 +281,12 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         }
 
         func removeAskPassScript() {
-            guard let askPassScriptPath else {
+            guard let askPassDirectoryPath else {
                 return
             }
 
-            let scriptURL = URL(fileURLWithPath: askPassScriptPath)
-            try? FileManager.default.removeItem(at: scriptURL.deletingLastPathComponent())
-            self.askPassScriptPath = nil
+            try? FileManager.default.removeItem(atPath: askPassDirectoryPath)
+            self.askPassDirectoryPath = nil
         }
 
         @MainActor

@@ -580,7 +580,8 @@ final class AppState {
             return
         }
 
-        let resumeOffset = localFileSize(at: localPath)
+        let workingPath = downloadWorkingPath(for: localPath)
+        let resumeOffset = localFileSize(at: workingPath)
         let transfer = appendTransfer(
             direction: .download,
             localPath: localPath,
@@ -595,6 +596,7 @@ final class AppState {
                 transfer.id,
                 remotePath: remoteFile.path,
                 localPath: localPath,
+                workingPath: workingPath,
                 totalBytes: remoteFile.size,
                 session: context.session
             )
@@ -656,6 +658,7 @@ final class AppState {
                     id,
                     remotePath: transfer.remotePath,
                     localPath: transfer.localPath,
+                    workingPath: self.downloadWorkingPath(for: transfer.localPath),
                     totalBytes: transfer.totalBytes,
                     session: context.session
                 )
@@ -1083,17 +1086,18 @@ final class AppState {
         _ id: TransferRecord.ID,
         remotePath: String,
         localPath: String,
+        workingPath: String,
         totalBytes: Int64,
         session: SSHSessionProviding
     ) async {
-        let resumeOffset = localFileSize(at: localPath)
+        let resumeOffset = localFileSize(at: workingPath)
         updateTransferProgress(id, bytesCompleted: resumeOffset, totalBytes: totalBytes)
 
         do {
             try Task.checkCancellation()
             try await sftpService.download(
                 remotePath: remotePath,
-                localPath: localPath,
+                localPath: workingPath,
                 resumeFrom: resumeOffset,
                 progress: { [weak self] bytesCompleted, totalBytes in
                     await self?.updateTransferProgress(
@@ -1105,11 +1109,27 @@ final class AppState {
                 session: session
             )
             try Task.checkCancellation()
+            try finalizeDownload(workingPath: workingPath, destinationPath: localPath)
             completeTransfer(id)
         } catch is CancellationError {
             cancelTransfer(id)
         } catch {
             failTransfer(id, message: String(describing: error))
+        }
+    }
+
+    private func downloadWorkingPath(for destinationPath: String) -> String {
+        destinationPath + ".termtp-download"
+    }
+
+    private func finalizeDownload(workingPath: String, destinationPath: String) throws {
+        let fileManager = FileManager.default
+        let workingURL = URL(fileURLWithPath: workingPath)
+        let destinationURL = URL(fileURLWithPath: destinationPath)
+        if fileManager.fileExists(atPath: destinationPath) {
+            _ = try fileManager.replaceItemAt(destinationURL, withItemAt: workingURL)
+        } else {
+            try fileManager.moveItem(at: workingURL, to: destinationURL)
         }
     }
 
