@@ -54,6 +54,21 @@ import TermCCore
 }
 
 @MainActor
+@Test func settingsPanelCanBePresentedFromMainWindowChrome() {
+    let state = AppState(connections: [])
+
+    #expect(!state.isSettingsPresented)
+
+    state.showSettings()
+
+    #expect(state.isSettingsPresented)
+
+    state.dismissSettings()
+
+    #expect(!state.isSettingsPresented)
+}
+
+@MainActor
 @Test func refreshRemoteFilesReportsUnsupportedSFTPToUser() async {
     let tab = TerminalTab(title: "Jump", state: .connected, transcript: "", session: UnsupportedSFTPSession())
     let state = AppState(tabs: [tab], connections: [], language: .zhHans)

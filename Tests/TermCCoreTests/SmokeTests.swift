@@ -3,6 +3,6 @@ import XCTest
 
 final class SmokeTests: XCTestCase {
     func testLibraryVersionIsReadable() {
-        XCTAssertEqual(TermCVersion.current, "0.1.0")
+        XCTAssertEqual(TermCVersion.current, "1.0")
     }
 }

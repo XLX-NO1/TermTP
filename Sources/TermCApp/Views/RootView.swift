@@ -63,6 +63,9 @@ struct RootView: View {
         .sheet(isPresented: $state.isConnectionFormPresented) {
             ConnectionFormView(state: state)
         }
+        .sheet(isPresented: $state.isSettingsPresented) {
+            SettingsView(state: state)
+        }
         .alert(
             state.t.trustHostKeyTitle,
             isPresented: Binding(
@@ -207,8 +210,24 @@ struct RootView: View {
             }
 
             Spacer(minLength: 0)
+
+            Button {
+                state.showSettings()
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 28, height: 22)
+                    .foregroundStyle(.white)
+                    .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 5))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 5)
+                            .stroke(Color.white.opacity(0.78), lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+            .help(state.t.settings)
         }
-        .padding(.leading, 8)
+        .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .frame(height: 30)
         .background(Color(red: 0.09, green: 0.10, blue: 0.11))

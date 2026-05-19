@@ -38,6 +38,7 @@ final class AppState {
     var transfers: [TransferRecord]
     var notification: AppNotification?
     var isConnectionFormPresented = false
+    var isSettingsPresented = false
     var draftAlias = ""
     var draftGroup = ""
     var draftHost = ""
@@ -198,6 +199,14 @@ final class AppState {
 
     func dismissNotification() {
         notification = nil
+    }
+
+    func showSettings() {
+        isSettingsPresented = true
+    }
+
+    func dismissSettings() {
+        isSettingsPresented = false
     }
 
     func closeTab(_ id: TerminalTab.ID) async {
