@@ -11,7 +11,6 @@ struct ConnectionFormView: View {
         let host = state.draftHost.trimmingCharacters(in: .whitespacesAndNewlines)
         let username = state.draftUsername.trimmingCharacters(in: .whitespacesAndNewlines)
         let privateKeyPath = state.draftPrivateKeyPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        let password = state.draftPassword.trimmingCharacters(in: .whitespacesAndNewlines)
         let keepAliveInterval = Int(state.draftKeepAliveInterval.trimmingCharacters(in: .whitespacesAndNewlines))
         let keepAliveMaxCount = Int(state.draftKeepAliveMaxCount.trimmingCharacters(in: .whitespacesAndNewlines))
         let forwardLocalPort = UInt16(state.draftForwardLocalPort.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -21,7 +20,6 @@ struct ConnectionFormView: View {
         return port.map { $0 > 0 } ?? false
             && !host.isEmpty
             && !username.isEmpty
-            && (state.draftUsesKey || !password.isEmpty)
             && (!state.draftUsesKey || !privateKeyPath.isEmpty)
             && (!state.draftKeepAliveEnabled || ((keepAliveInterval ?? 0) > 0 && (keepAliveMaxCount ?? 0) > 0))
             && (!state.draftForwardEnabled || forwardLocalPort != nil)

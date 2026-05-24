@@ -63,6 +63,7 @@ struct LocalSSHTerminalView: NSViewRepresentable {
     private func startSSH(in terminalView: LocalProcessTerminalView, context: Context) {
         context.coordinator.startedConnectionID = connection.id
         context.coordinator.removeAskPassScript()
+        Self.prepareKnownHostsFile()
         let askPass = Self.password(from: credential).map(Self.makeAskPassBundle)
         context.coordinator.askPassDirectoryPath = askPass?.directoryPath
         let launch = Self.launchConfiguration(

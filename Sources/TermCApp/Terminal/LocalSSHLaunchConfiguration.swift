@@ -35,7 +35,7 @@ extension LocalSSHTerminalView {
             return LaunchConfiguration(
                 executable: "/usr/bin/ssh",
                 args: sshArguments(for: connection),
-                environment: nil
+                environment: terminalEnvironment(additionalValues: [:])
             )
         }
 
@@ -49,6 +49,21 @@ extension LocalSSHTerminalView {
                 "SSH_ASKPASS_REQUIRE": "force",
                 "DISPLAY": "termtp:0"
             ])
+        )
+    }
+
+    static var knownHostsFileURL: URL {
+        FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("TermTP", isDirectory: true)
+            .appendingPathComponent("known_hosts")
+    }
+
+    static func prepareKnownHostsFile() {
+        let directory = knownHostsFileURL.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
         )
     }
 
@@ -119,6 +134,7 @@ extension LocalSSHTerminalView {
     private static func sshArguments(for connection: ConnectionRecord) -> [String] {
         var args = [
             "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "UserKnownHostsFile=\(knownHostsFileURL.path)",
             "-p", String(connection.port),
             "\(connection.username)@\(connection.host)"
         ]

@@ -24,6 +24,17 @@ import TermCCore
 }
 
 @MainActor
+@Test func manualPasswordLaunchEnvironmentKeepsTermVariable() {
+    let launch = LocalSSHTerminalView.launchConfiguration(
+        for: ConnectionRecord.samplePassword,
+        credential: nil
+    )
+
+    #expect(launch.environment?.contains("TERM=xterm-256color") == true)
+    #expect(launch.environment?.contains("SSH_ASKPASS_REQUIRE=force") == false)
+}
+
+@MainActor
 @Test func askPassBundleUsesIsolatedTemporaryDirectoryAndRestrictedPasswordFile() throws {
     let first = LocalSSHTerminalView.makeAskPassBundle(password: "first-secret")
     let second = LocalSSHTerminalView.makeAskPassBundle(password: "second-secret")
@@ -75,12 +86,32 @@ import TermCCore
     #expect(launch.args.contains("jump.example.com"))
     #expect(launch.args.contains("-L"))
     #expect(launch.args.contains("127.0.0.1:8080:localhost:80"))
-    #expect(launch.args.suffix(5) == [
+    #expect(launch.args.suffix(7) == [
         "-o",
         "StrictHostKeyChecking=accept-new",
+        "-o",
+        "UserKnownHostsFile=\(LocalSSHTerminalView.knownHostsFileURL.path)",
         "-p",
         "2222",
         "deploy@prod.example.com"
+    ])
+}
+
+@MainActor
+@Test func launchArgumentsUseTermTPKnownHostsFile() {
+    let launch = LocalSSHTerminalView.launchConfiguration(
+        for: ConnectionRecord.samplePassword,
+        credential: nil
+    )
+
+    #expect(launch.args.suffix(7) == [
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-o",
+        "UserKnownHostsFile=\(LocalSSHTerminalView.knownHostsFileURL.path)",
+        "-p",
+        "22",
+        "me@localhost"
     ])
 }
 

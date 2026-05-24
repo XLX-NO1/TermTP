@@ -30,6 +30,50 @@ public actor InMemoryCredentialStore: CredentialStoring {
     }
 }
 
+public actor FileCredentialStore: CredentialStoring {
+    private let fileURL: URL
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL
+    }
+
+    public func save(_ credential: Credential, for connectionID: UUID) async throws {
+        var state = try readState()
+        state.credentials[connectionID.uuidString] = CredentialPayload(credential: credential)
+        try writeState(state)
+    }
+
+    public func load(for connectionID: UUID) async throws -> Credential? {
+        try readState().credentials[connectionID.uuidString]?.credential
+    }
+
+    public func delete(for connectionID: UUID) async throws {
+        var state = try readState()
+        state.credentials[connectionID.uuidString] = nil
+        try writeState(state)
+    }
+
+    private func readState() throws -> FileCredentialState {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            return FileCredentialState(credentials: [:])
+        }
+
+        let data = try Data(contentsOf: fileURL)
+        return try JSONDecoder.termc.decode(FileCredentialState.self, from: data)
+    }
+
+    private func writeState(_ state: FileCredentialState) throws {
+        let directory = fileURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let data = try JSONEncoder.termc.encode(state)
+        try data.write(to: fileURL, options: [.atomic])
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: fileURL.path
+        )
+    }
+}
+
 public struct KeychainCredentialStore: CredentialStoring {
     private let service = "local.termtp.credentials"
 
@@ -37,7 +81,7 @@ public struct KeychainCredentialStore: CredentialStoring {
 
     public func save(_ credential: Credential, for connectionID: UUID) async throws {
         try await delete(for: connectionID)
-        let data = try JSONEncoder.termc.encode(KeychainPayload(credential: credential))
+        let data = try JSONEncoder.termc.encode(CredentialPayload(credential: credential))
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -60,7 +104,7 @@ public struct KeychainCredentialStore: CredentialStoring {
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess, let data = result as? Data else { throw KeychainError.status(status) }
-        return try JSONDecoder.termc.decode(KeychainPayload.self, from: data).credential
+        return try JSONDecoder.termc.decode(CredentialPayload.self, from: data).credential
     }
 
     public func delete(for connectionID: UUID) async throws {
@@ -74,7 +118,11 @@ public struct KeychainCredentialStore: CredentialStoring {
     }
 }
 
-private struct KeychainPayload: Codable {
+private struct FileCredentialState: Codable {
+    var credentials: [String: CredentialPayload]
+}
+
+private struct CredentialPayload: Codable {
     var kind: String
     var value: String
 

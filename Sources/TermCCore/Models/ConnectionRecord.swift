@@ -74,6 +74,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
     public var tags: [String]
     public var group: String?
     public var isFavorite: Bool
+    public var isHistoryVisible: Bool
     public var keepAlive: KeepAlive
     public var jumpHost: String?
     public var portForwards: [PortForward]
@@ -92,6 +93,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
         tags: [String] = [],
         group: String? = nil,
         isFavorite: Bool = false,
+        isHistoryVisible: Bool = true,
         keepAlive: KeepAlive = KeepAlive(),
         jumpHost: String? = nil,
         portForwards: [PortForward] = [],
@@ -109,6 +111,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
         self.tags = tags
         self.group = group
         self.isFavorite = isFavorite
+        self.isHistoryVisible = isHistoryVisible
         self.keepAlive = keepAlive
         self.jumpHost = jumpHost
         self.portForwards = portForwards
@@ -128,6 +131,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
         case tags
         case group
         case isFavorite
+        case isHistoryVisible
         case keepAlive
         case jumpHost
         case portForwards
@@ -148,6 +152,7 @@ public struct ConnectionRecord: Codable, Equatable, Identifiable, Sendable {
         self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         self.group = try container.decodeIfPresent(String.self, forKey: .group)
         self.isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+        self.isHistoryVisible = try container.decodeIfPresent(Bool.self, forKey: .isHistoryVisible) ?? true
         self.keepAlive = try container.decodeIfPresent(KeepAlive.self, forKey: .keepAlive) ?? KeepAlive()
         self.jumpHost = try container.decodeIfPresent(String.self, forKey: .jumpHost)
         self.portForwards = try container.decodeIfPresent([PortForward].self, forKey: .portForwards) ?? []

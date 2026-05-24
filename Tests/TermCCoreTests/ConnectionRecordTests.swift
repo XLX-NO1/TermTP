@@ -13,6 +13,7 @@ final class ConnectionRecordTests: XCTestCase {
             tags: ["prod", "api"],
             group: "Production",
             isFavorite: true,
+            isHistoryVisible: false,
             defaultRemotePath: "/var/www",
             lastConnectedAt: Date(timeIntervalSince1970: 100),
             createdAt: Date(timeIntervalSince1970: 1),
@@ -26,6 +27,7 @@ final class ConnectionRecordTests: XCTestCase {
 
         let decoded = try JSONDecoder.termc.decode(ConnectionRecord.self, from: data)
         XCTAssertEqual(decoded, record)
+        XCTAssertFalse(decoded.isHistoryVisible)
     }
 
     func testHistoryRecordFromConnectionDoesNotIncludeSecretFields() {
@@ -65,6 +67,7 @@ final class ConnectionRecordTests: XCTestCase {
         XCTAssertTrue(record.portForwards.isEmpty)
         XCTAssertNil(record.defaultRemotePath)
         XCTAssertNil(record.group)
+        XCTAssertTrue(record.isHistoryVisible)
     }
 
     func testTransferRecordComputesSpeedAndRemainingTime() {

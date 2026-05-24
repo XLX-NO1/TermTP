@@ -177,6 +177,33 @@ import TermCCore
 }
 
 @MainActor
+@Test func connectDraftConnectionWithEmptyPasswordStartsInteractiveLocalSSH() async {
+    let credentialStore = InMemoryCredentialStore()
+    let state = AppState(
+        connections: [],
+        sshClient: FailingSSHClient(),
+        credentialStore: credentialStore,
+        sftpService: RecordingSFTPService(filesByPath: [:])
+    )
+    state.draftAlias = "Manual Password"
+    state.draftHost = "example.com"
+    state.draftPort = "22"
+    state.draftUsername = "deploy"
+    state.draftPassword = " \n "
+    state.draftPrivateKeyPassphrase = "stale-key-passphrase"
+
+    await state.connectDraftConnection()
+
+    let connection = state.connections[0]
+
+    #expect(state.tabs.last?.state == .connected)
+    #expect(state.tabs.last?.localProcess == .ssh(connection, credential: nil))
+    let savedCredential = try? await credentialStore.load(for: connection.id)
+    #expect(savedCredential == nil)
+    #expect(state.remoteFiles.isEmpty)
+}
+
+@MainActor
 @Test func jumpHostConnectionStartsLocalSSHWithoutCitadelPreflight() async {
     let state = AppState(
         connections: [],
@@ -440,20 +467,25 @@ import TermCCore
 }
 
 @MainActor
-@Test func clearHistoryKeepsFavorites() {
+@Test func clearHistoryHidesHistoryWithoutDeletingFavoritesOrRecentItems() {
     var favorite = ConnectionRecord.samplePassword
     favorite.isFavorite = true
+    favorite.lastConnectedAt = Date(timeIntervalSince1970: 100)
     let history = ConnectionRecord(
         alias: "History",
         host: "history.example.com",
         username: "deploy",
-        authentication: .password
+        authentication: .password,
+        lastConnectedAt: Date(timeIntervalSince1970: 200)
     )
     let state = AppState(connections: [favorite, history])
 
     state.clearHistory()
 
-    #expect(state.connections == [favorite])
+    #expect(state.connections.count == 2)
+    #expect(state.favoriteConnections.map(\.id) == [favorite.id])
+    #expect(state.historyConnections.isEmpty)
+    #expect(state.recentConnections.map(\.id) == [history.id, favorite.id])
 }
 
 @MainActor
@@ -493,14 +525,47 @@ import TermCCore
 }
 
 @MainActor
-@Test func deleteHistoryConnectionDoesNotDeleteFavoriteConnection() {
+@Test func deleteFavoriteKeepsHistoryAndRecentMembership() {
     var favorite = ConnectionRecord.samplePassword
     favorite.isFavorite = true
+    favorite.lastConnectedAt = Date(timeIntervalSince1970: 100)
+    let state = AppState(connections: [favorite])
+
+    state.deleteFavoriteConnection(favorite.id)
+
+    #expect(state.favoriteConnections.isEmpty)
+    #expect(state.historyConnections.map(\.id) == [favorite.id])
+    #expect(state.recentConnections.map(\.id) == [favorite.id])
+}
+
+@MainActor
+@Test func deleteHistoryConnectionKeepsFavoriteAndRecentMembership() {
+    var favorite = ConnectionRecord.samplePassword
+    favorite.isFavorite = true
+    favorite.lastConnectedAt = Date(timeIntervalSince1970: 100)
     let state = AppState(connections: [favorite])
 
     state.deleteHistoryConnection(favorite.id)
 
-    #expect(state.connections == [favorite])
+    #expect(state.connections.count == 1)
+    #expect(state.favoriteConnections.map(\.id) == [favorite.id])
+    #expect(state.historyConnections.isEmpty)
+    #expect(state.recentConnections.map(\.id) == [favorite.id])
+}
+
+@MainActor
+@Test func deleteRecentConnectionKeepsFavoriteAndHistoryMembership() {
+    var favorite = ConnectionRecord.samplePassword
+    favorite.isFavorite = true
+    favorite.lastConnectedAt = Date(timeIntervalSince1970: 100)
+    let state = AppState(connections: [favorite])
+
+    state.deleteRecentConnection(favorite.id)
+
+    #expect(state.connections.count == 1)
+    #expect(state.favoriteConnections.map(\.id) == [favorite.id])
+    #expect(state.historyConnections.map(\.id) == [favorite.id])
+    #expect(state.recentConnections.isEmpty)
 }
 
 @MainActor
@@ -529,7 +594,7 @@ import TermCCore
 }
 
 @MainActor
-@Test func historyConnectionsExcludeFavorites() {
+@Test func historyConnectionsIncludeFavoritesWhenHistoryIsVisible() {
     var favorite = ConnectionRecord.samplePassword
     favorite.isFavorite = true
     let history = ConnectionRecord(
@@ -541,7 +606,7 @@ import TermCCore
     let state = AppState(connections: [favorite, history])
 
     #expect(state.favoriteConnections == [favorite])
-    #expect(state.historyConnections == [history])
+    #expect(state.historyConnections == [favorite, history])
 }
 
 @MainActor

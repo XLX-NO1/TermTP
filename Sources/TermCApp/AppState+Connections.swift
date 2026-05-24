@@ -7,7 +7,7 @@ extension AppState {
     }
 
     var historyConnections: [ConnectionRecord] {
-        connections.filter { !$0.isFavorite }
+        connections.filter(\.isHistoryVisible)
     }
 
     var recentConnections: [ConnectionRecord] {
@@ -32,7 +32,10 @@ extension AppState {
     }
 
     func clearHistory() {
-        connections.removeAll { !$0.isFavorite }
+        for index in connections.indices {
+            connections[index].isHistoryVisible = false
+            connections[index].updatedAt = Date()
+        }
         Task {
             await persistConnections()
         }
@@ -41,12 +44,42 @@ extension AppState {
     func deleteConnection(_ id: ConnectionRecord.ID) {
         connections.removeAll { $0.id == id }
         Task {
+            try? await credentialStore.delete(for: id)
             await persistConnections()
         }
     }
 
     func deleteHistoryConnection(_ id: ConnectionRecord.ID) {
-        connections.removeAll { $0.id == id && !$0.isFavorite }
+        guard let index = connections.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+
+        connections[index].isHistoryVisible = false
+        connections[index].updatedAt = Date()
+        Task {
+            await persistConnections()
+        }
+    }
+
+    func deleteFavoriteConnection(_ id: ConnectionRecord.ID) {
+        guard let index = connections.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+
+        connections[index].isFavorite = false
+        connections[index].updatedAt = Date()
+        Task {
+            await persistConnections()
+        }
+    }
+
+    func deleteRecentConnection(_ id: ConnectionRecord.ID) {
+        guard let index = connections.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+
+        connections[index].lastConnectedAt = nil
+        connections[index].updatedAt = Date()
         Task {
             await persistConnections()
         }
@@ -133,12 +166,13 @@ extension AppState {
         isConnectionFormPresented = false
         await persistConnections()
 
-        let credential: Credential? = if connection.authentication.kind == .password {
-            .password(draftPassword)
-        } else if draftPrivateKeyPassphrase.isEmpty {
-            nil
-        } else {
-            .privateKeyPassphrase(draftPrivateKeyPassphrase)
+        let password = draftPassword.trimmingCharacters(in: .whitespacesAndNewlines)
+        let privateKeyPassphrase = draftPrivateKeyPassphrase.trimmingCharacters(in: .whitespacesAndNewlines)
+        let credential: Credential? = switch connection.authentication {
+        case .password:
+            password.isEmpty ? nil : .password(password)
+        case .publicKey:
+            privateKeyPassphrase.isEmpty ? nil : .privateKeyPassphrase(privateKeyPassphrase)
         }
 
         if let credential {
@@ -181,7 +215,7 @@ extension AppState {
         selectedTabID = tab.id
         setRemotePath(connection.defaultRemotePath ?? ".", for: tab.id)
 
-        if connection.requiresLocalSSHOnly {
+        if requiresLocalSSHOnly(connection, credential: credential) {
             updateTab(
                 id: tab.id,
                 state: .connected,
@@ -221,6 +255,11 @@ extension AppState {
                 """
             )
         }
+    }
+
+    func requiresLocalSSHOnly(_ connection: ConnectionRecord, credential: Credential?) -> Bool {
+        connection.requiresLocalSSHOnly
+            || (connection.authentication.kind == .password && credential == nil)
     }
 
     func connectWithTimeout(

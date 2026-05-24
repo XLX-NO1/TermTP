@@ -21,11 +21,26 @@ struct ConnectionSidebarView: View {
     }
 
     private var favorites: [ConnectionRecord] {
-        filteredConnections.filter { state.favoriteConnections.contains($0) }
+        filteredConnections.filter { favoriteIDs.contains($0.id) }
     }
 
     private var history: [ConnectionRecord] {
-        filteredConnections.filter { state.historyConnections.contains($0) }
+        filteredConnections.filter { historyIDs.contains($0.id) }
+    }
+
+    private var favoriteIDs: Set<ConnectionRecord.ID> {
+        Set(state.favoriteConnections.map(\.id))
+    }
+
+    private var historyIDs: Set<ConnectionRecord.ID> {
+        Set(state.historyConnections.map(\.id))
+    }
+
+    private enum ConnectionSectionKind {
+        case recent
+        case favorites
+        case history
+        case normal
     }
 
     var body: some View {
@@ -49,17 +64,17 @@ struct ConnectionSidebarView: View {
                 .controlSize(.small)
 
             if searchText.isEmpty {
-                connectionSection(state.t.recent, connections: state.recentConnections, isHistory: false)
+                connectionSection(state.t.recent, connections: state.recentConnections, kind: .recent)
             }
 
-            connectionSection(state.t.favorites, connections: favorites, isHistory: false)
+            connectionSection(state.t.favorites, connections: favorites, kind: .favorites)
 
             if searchText.isEmpty {
                 ForEach(state.connectionTags, id: \.self) { tag in
                     connectionSection(
                         "#\(tag)",
                         connections: state.connections.filter { $0.tags.contains(tag) },
-                        isHistory: false
+                        kind: .normal
                     )
                 }
 
@@ -67,12 +82,12 @@ struct ConnectionSidebarView: View {
                     connectionSection(
                         group,
                         connections: state.connections.filter { $0.group == group },
-                        isHistory: false
+                        kind: .normal
                     )
                 }
             }
 
-            connectionSection(state.t.history, connections: history, isHistory: true)
+            connectionSection(state.t.history, connections: history, kind: .history)
 
             Spacer(minLength: 0)
 
@@ -127,7 +142,7 @@ struct ConnectionSidebarView: View {
     private func connectionSection(
         _ title: String,
         connections: [ConnectionRecord],
-        isHistory: Bool
+        kind: ConnectionSectionKind
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
@@ -158,15 +173,24 @@ struct ConnectionSidebarView: View {
                         }
 
                         Button(state.t.delete, role: .destructive) {
-                            if isHistory {
-                                state.deleteHistoryConnection(connection.id)
-                            } else {
-                                state.deleteConnection(connection.id)
-                            }
+                            deleteConnection(connection.id, from: kind)
                         }
                     }
                 }
             }
+        }
+    }
+
+    private func deleteConnection(_ id: ConnectionRecord.ID, from kind: ConnectionSectionKind) {
+        switch kind {
+        case .recent:
+            state.deleteRecentConnection(id)
+        case .favorites:
+            state.deleteFavoriteConnection(id)
+        case .history:
+            state.deleteHistoryConnection(id)
+        case .normal:
+            state.deleteConnection(id)
         }
     }
 

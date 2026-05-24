@@ -9,16 +9,28 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
         var key: String
     }
 
-    private let defaults: UserDefaults
-    private let defaultsKey = "TermTP.trustedHostKeys"
+    static var defaultFileURL: URL {
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return FileManager.default.temporaryDirectory
+                .appendingPathComponent("TermTPTests-\(UUID().uuidString)", isDirectory: true)
+                .appendingPathComponent("trusted-host-keys.json")
+        }
+
+        return FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("TermTP", isDirectory: true)
+            .appendingPathComponent("trusted-host-keys.json")
+    }
+
+    private let fileURL: URL
     private var trustedKeys: [String: String]
     private var pendingContinuation: CheckedContinuation<Bool, Never>?
     var pendingPrompt: HostKeyPrompt?
     var onPromptChanged: ((HostKeyPrompt?) -> Void)?
 
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-        self.trustedKeys = defaults.dictionary(forKey: defaultsKey) as? [String: String] ?? [:]
+    init(fileURL: URL = AppHostKeyTrustStore.defaultFileURL) {
+        self.fileURL = fileURL
+        self.trustedKeys = (try? Self.loadTrustedKeys(from: fileURL)) ?? [:]
     }
 
     func trustedKey(host: String, port: UInt16) async -> String? {
@@ -27,7 +39,7 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
 
     func saveTrustedKey(_ key: String, host: String, port: UInt16) async throws {
         trustedKeys[self.key(for: host, port: port)] = key
-        defaults.set(trustedKeys, forKey: defaultsKey)
+        try Self.persistTrustedKeys(trustedKeys, to: fileURL)
     }
 
     var trustedHostKeys: [TrustedHostKey] {
@@ -38,12 +50,12 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
 
     func removeTrustedKey(hostPort: String) {
         trustedKeys[hostPort] = nil
-        defaults.set(trustedKeys, forKey: defaultsKey)
+        try? Self.persistTrustedKeys(trustedKeys, to: fileURL)
     }
 
     func clearTrustedKeys() {
         trustedKeys.removeAll()
-        defaults.set(trustedKeys, forKey: defaultsKey)
+        try? Self.persistTrustedKeys(trustedKeys, to: fileURL)
     }
 
     func requestTrust(for prompt: HostKeyPrompt) async -> Bool {
@@ -57,7 +69,7 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
     func resolvePendingPrompt(trusted: Bool) {
         if trusted, let pendingPrompt {
             trustedKeys[key(for: pendingPrompt.host, port: pendingPrompt.port)] = pendingPrompt.key
-            defaults.set(trustedKeys, forKey: defaultsKey)
+            try? Self.persistTrustedKeys(trustedKeys, to: fileURL)
         }
 
         pendingPrompt = nil
@@ -68,5 +80,25 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
 
     private func key(for host: String, port: UInt16) -> String {
         "\(host):\(port)"
+    }
+
+    private static func loadTrustedKeys(from fileURL: URL) throws -> [String: String] {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            return [:]
+        }
+
+        let data = try Data(contentsOf: fileURL)
+        return try JSONDecoder.termc.decode([String: String].self, from: data)
+    }
+
+    private static func persistTrustedKeys(_ keys: [String: String], to fileURL: URL) throws {
+        let directory = fileURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let data = try JSONEncoder.termc.encode(keys)
+        try data.write(to: fileURL, options: [.atomic])
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: fileURL.path
+        )
     }
 }

@@ -5,10 +5,26 @@ import TermCCore
 @Observable
 @MainActor
 final class AppState {
-    static let defaultConnectionStoreURL = FileManager.default
-        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("TermTP", isDirectory: true)
-        .appendingPathComponent("connections.json")
+    static var defaultConnectionStoreURL: URL {
+        defaultApplicationSupportDirectory
+            .appendingPathComponent("connections.json")
+    }
+
+    static var defaultCredentialStoreURL: URL {
+        defaultApplicationSupportDirectory
+            .appendingPathComponent("credentials.json")
+    }
+
+    private static var defaultApplicationSupportDirectory: URL {
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return FileManager.default.temporaryDirectory
+                .appendingPathComponent("TermTPTests-\(UUID().uuidString)", isDirectory: true)
+        }
+
+        return FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("TermTP", isDirectory: true)
+    }
 
     let sshClient: any SSHClientProviding
     let credentialStore: any CredentialStoring
@@ -90,7 +106,7 @@ final class AppState {
         terminalTheme: TerminalTheme? = nil,
         defaults: UserDefaults = .standard,
         sshClient: (any SSHClientProviding)? = nil,
-        credentialStore: any CredentialStoring = KeychainCredentialStore(),
+        credentialStore: any CredentialStoring = FileCredentialStore(fileURL: AppState.defaultCredentialStoreURL),
         sftpService: any SFTPServicing = CitadelSFTPService(),
         connectionStore: ConnectionStore = ConnectionStore(fileURL: AppState.defaultConnectionStoreURL),
         connectionTimeoutSeconds: Double = 10
