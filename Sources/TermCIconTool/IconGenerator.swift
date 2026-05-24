@@ -18,65 +18,44 @@ enum IconGenerator {
 
     private static func drawAppIcon(pixelSize: Int) -> NSBitmapImageRep {
         drawBitmap(pixelWidth: pixelSize, pixelHeight: pixelSize) { context, bounds in
-
             context.setShouldAntialias(true)
-            let cornerRadius = bounds.width * 0.19
-            let roundedRect = CGPath(
-                roundedRect: bounds.insetBy(dx: 24, dy: 24),
-                cornerWidth: cornerRadius,
-                cornerHeight: cornerRadius,
+
+            let iconRect = bounds.insetBy(dx: bounds.width * 0.035, dy: bounds.height * 0.035)
+            let iconPath = CGPath(
+                roundedRect: iconRect,
+                cornerWidth: bounds.width * 0.205,
+                cornerHeight: bounds.width * 0.205,
                 transform: nil
             )
 
+            drawOuterShadow(for: iconPath, in: context)
+
             context.saveGState()
-            context.addPath(roundedRect)
+            context.addPath(iconPath)
             context.clip()
-
-            let background = CGGradient(
-                colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                colors: [
-                    NSColor(calibratedRed: 0.03, green: 0.04, blue: 0.05, alpha: 1).cgColor,
-                    NSColor(calibratedRed: 0.10, green: 0.12, blue: 0.13, alpha: 1).cgColor
-                ] as CFArray,
-                locations: [0, 1]
-            )
-            if let background {
-                context.drawLinearGradient(
-                    background,
-                    start: CGPoint(x: bounds.minX, y: bounds.maxY),
-                    end: CGPoint(x: bounds.maxX, y: bounds.minY),
-                    options: []
-                )
-            }
-
-            drawSparkles(in: bounds)
-
-            context.setStrokeColor(NSColor(calibratedWhite: 1, alpha: 0.08).cgColor)
-            context.setLineWidth(8)
-            context.addPath(roundedRect)
-            context.strokePath()
+            drawBackground(in: iconRect, context: context)
+            drawCornerGlow(in: iconRect, context: context)
+            drawTerminalPanel(in: iconRect, context: context)
             context.restoreGState()
 
-            drawMagicHexagram(
-                in: CGRect(
-                    x: bounds.width * 0.16,
-                    y: bounds.height * 0.16,
-                    width: bounds.width * 0.68,
-                    height: bounds.height * 0.68
-                ),
-                color: .white,
-                lineWidth: bounds.width * 0.011,
-                drawsTerminalPrompt: true
-            )
+            context.saveGState()
+            context.addPath(iconPath)
+            context.setStrokeColor(NSColor(calibratedWhite: 1, alpha: 0.11).cgColor)
+            context.setLineWidth(bounds.width * 0.010)
+            context.strokePath()
+            context.restoreGState()
         }
     }
 
     private static func drawMenuBarTemplate(pixelSize: Int) -> NSBitmapImageRep {
-        drawBitmap(pixelWidth: pixelSize, pixelHeight: pixelSize) { _, bounds in
-            drawCompactMagicHexagram(
-                in: CGRect(x: bounds.width * 0.10, y: bounds.height * 0.10, width: bounds.width * 0.80, height: bounds.height * 0.80),
+        drawBitmap(pixelWidth: pixelSize, pixelHeight: pixelSize) { context, bounds in
+            context.setShouldAntialias(true)
+            drawPromptMark(
+                in: bounds.insetBy(dx: bounds.width * 0.14, dy: bounds.height * 0.19),
                 color: .white,
-                lineWidth: bounds.width * 0.070
+                lineWidth: bounds.width * 0.095,
+                glow: nil,
+                context: context
             )
         }
     }
@@ -116,355 +95,184 @@ enum IconGenerator {
         return bitmap
     }
 
-    private static func drawSparkles(in bounds: CGRect) {
-        let sparkles: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
-            (0.25, 0.26, 0.017, 0.70),
-            (0.74, 0.28, 0.011, 0.55),
-            (0.24, 0.74, 0.010, 0.45),
-            (0.77, 0.70, 0.015, 0.65),
-            (0.50, 0.83, 0.009, 0.42)
-        ]
-
-        for sparkle in sparkles {
-            drawSparkle(
-                center: CGPoint(x: bounds.width * sparkle.0, y: bounds.height * sparkle.1),
-                radius: bounds.width * sparkle.2,
-                alpha: sparkle.3
-            )
-        }
-    }
-
-    private static func drawSparkle(center: CGPoint, radius: CGFloat, alpha: CGFloat) {
-        guard let context = NSGraphicsContext.current?.cgContext else {
-            return
-        }
-
+    private static func drawOuterShadow(for path: CGPath, in context: CGContext) {
         context.saveGState()
-        context.setStrokeColor(NSColor(calibratedWhite: 1, alpha: alpha).cgColor)
-        context.setLineWidth(radius * 0.22)
-        context.setLineCap(.round)
         context.setShadow(
-            offset: .zero,
-            blur: radius * 1.6,
-            color: NSColor(calibratedWhite: 1, alpha: alpha * 0.5).cgColor
+            offset: CGSize(width: 0, height: -18),
+            blur: 34,
+            color: NSColor(calibratedWhite: 0, alpha: 0.30).cgColor
         )
-        context.beginPath()
-        context.move(to: CGPoint(x: center.x - radius, y: center.y))
-        context.addLine(to: CGPoint(x: center.x + radius, y: center.y))
-        context.move(to: CGPoint(x: center.x, y: center.y - radius))
-        context.addLine(to: CGPoint(x: center.x, y: center.y + radius))
-        context.strokePath()
-        context.restoreGState()
-    }
-
-    private static func drawTerminalPrompt(in rect: CGRect, color: NSColor) {
-        let prompt = ">_"
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = .center
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: rect.width * 0.23, weight: .bold),
-            .foregroundColor: color,
-            .paragraphStyle: paragraphStyle
-        ]
-
-        let textSize = prompt.size(withAttributes: attributes)
-        let textRect = CGRect(
-            x: rect.midX - textSize.width / 2,
-            y: rect.midY - textSize.height / 2 - rect.height * 0.018,
-            width: textSize.width,
-            height: textSize.height
-        )
-        prompt.draw(in: textRect, withAttributes: attributes)
-    }
-
-    private static func drawMagicHexagram(
-        in rect: CGRect,
-        color: NSColor,
-        lineWidth: CGFloat,
-        drawsTerminalPrompt: Bool
-    ) {
-        guard let context = NSGraphicsContext.current?.cgContext else {
-            return
-        }
-
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2
-        let upward = trianglePoints(center: center, radius: radius * 0.70, rotation: -.pi / 2)
-        let downward = trianglePoints(center: center, radius: radius * 0.70, rotation: .pi / 2)
-
-        let outerCircle = CGRect(
-            x: center.x - radius,
-            y: center.y - radius,
-            width: radius * 2,
-            height: radius * 2
-        )
-
-        drawFlowingRibbons(center: center, radius: radius, color: color, lineWidth: lineWidth)
-
-        context.saveGState()
-        context.setShouldAntialias(true)
-        context.setLineJoin(.round)
-        context.setLineCap(.round)
-        context.setShadow(
-            offset: .zero,
-            blur: lineWidth * 6.0,
-            color: color.withAlphaComponent(0.44).cgColor
-        )
-        context.setStrokeColor(color.withAlphaComponent(0.24).cgColor)
-        context.setLineWidth(lineWidth * 2.4)
-        context.strokeEllipse(in: outerCircle)
-        strokePolygon(upward, in: context)
-        strokePolygon(downward, in: context)
-        strokeCircle(center: center, radius: radius * 0.78, in: context)
-        strokeCircle(center: center, radius: radius * 0.55, in: context)
-        strokeCircle(center: center, radius: radius * 0.30, in: context)
-        drawPortalTicks(center: center, radius: radius, color: color.withAlphaComponent(0.38), lineWidth: lineWidth * 1.2, count: 48, in: context)
-        drawStarMedallions(center: center, radius: radius * 0.82, color: color.withAlphaComponent(0.34), lineWidth: lineWidth * 1.15, in: context)
-        context.restoreGState()
-
-        context.saveGState()
-        context.setShouldAntialias(true)
-        context.setStrokeColor(color.cgColor)
-        context.setLineWidth(lineWidth * 2.4)
-        context.setLineJoin(.round)
-        context.setLineCap(.round)
-        context.strokeEllipse(in: outerCircle)
-
-        context.setLineWidth(lineWidth * 1.35)
-        strokePolygon(upward, in: context)
-        strokePolygon(downward, in: context)
-        drawTriangleOverlays(center: center, radius: radius, color: color.withAlphaComponent(0.88), lineWidth: lineWidth * 0.58, in: context)
-
-        context.setLineWidth(lineWidth * 0.72)
-        context.setStrokeColor(color.withAlphaComponent(0.80).cgColor)
-        strokeCircle(center: center, radius: radius * 0.78, in: context)
-        context.setStrokeColor(color.withAlphaComponent(0.52).cgColor)
-        strokeCircle(center: center, radius: radius * 0.55, in: context)
-        context.setStrokeColor(color.withAlphaComponent(0.92).cgColor)
-        strokeCircle(center: center, radius: radius * 0.30, in: context)
-        drawPortalTicks(center: center, radius: radius, color: color.withAlphaComponent(0.88), lineWidth: lineWidth * 0.48, count: 48, in: context)
-        drawStarMedallions(center: center, radius: radius * 0.82, color: color, lineWidth: lineWidth * 0.70, in: context)
-        drawSmallStars(center: center, radius: radius * 0.61, color: color.withAlphaComponent(0.85), in: context)
-
-        context.restoreGState()
-
-        if drawsTerminalPrompt {
-            drawTerminalPrompt(
-                in: rect,
-                color: NSColor(calibratedRed: 0.25, green: 0.94, blue: 0.48, alpha: 1)
-            )
-        }
-    }
-
-    private static func drawCompactMagicHexagram(in rect: CGRect, color: NSColor, lineWidth: CGFloat) {
-        guard let context = NSGraphicsContext.current?.cgContext else {
-            return
-        }
-
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2
-        let upward = trianglePoints(center: center, radius: radius * 0.68, rotation: -.pi / 2)
-        let downward = trianglePoints(center: center, radius: radius * 0.68, rotation: .pi / 2)
-
-        context.saveGState()
-        context.setShouldAntialias(true)
-        context.setStrokeColor(color.cgColor)
-        context.setLineWidth(lineWidth)
-        context.setLineJoin(.round)
-        context.setLineCap(.round)
-
-        strokeCircle(center: center, radius: radius, in: context)
-        strokePolygon(upward, in: context)
-        strokePolygon(downward, in: context)
-        context.setLineWidth(lineWidth * 0.62)
-        strokeCircle(center: center, radius: radius * 0.34, in: context)
-
-        context.restoreGState()
-
-        drawTerminalPrompt(in: rect, color: color)
-    }
-
-    private static func trianglePoints(center: CGPoint, radius: CGFloat, rotation: CGFloat) -> [CGPoint] {
-        (0..<3).map { index in
-            let angle = rotation + CGFloat(index) * 2 * .pi / 3
-            return CGPoint(
-                x: center.x + cos(angle) * radius,
-                y: center.y + sin(angle) * radius
-            )
-        }
-    }
-
-    private static func strokePolygon(_ points: [CGPoint], in context: CGContext) {
-        guard let first = points.first else {
-            return
-        }
-
-        context.beginPath()
-        context.move(to: first)
-        for point in points.dropFirst() {
-            context.addLine(to: point)
-        }
-        context.closePath()
-        context.strokePath()
-    }
-
-    private static func strokeCircle(center: CGPoint, radius: CGFloat, in context: CGContext) {
-        context.strokeEllipse(
-            in: CGRect(
-                x: center.x - radius,
-                y: center.y - radius,
-                width: radius * 2,
-                height: radius * 2
-            )
-        )
-    }
-
-    private static func drawPortalTicks(
-        center: CGPoint,
-        radius: CGFloat,
-        color: NSColor,
-        lineWidth: CGFloat,
-        count: Int = 24,
-        in context: CGContext
-    ) {
-        context.saveGState()
-        context.setStrokeColor(color.cgColor)
-        context.setLineWidth(lineWidth)
-
-        for index in 0..<count {
-            let angle = CGFloat(index) * 2 * .pi / CGFloat(count)
-            let isMajorTick = index % 6 == 0
-            let outer = point(center: center, radius: radius * 0.98, angle: angle)
-            let inner = point(center: center, radius: radius * (isMajorTick ? 0.88 : 0.92), angle: angle)
-            context.beginPath()
-            context.move(to: outer)
-            context.addLine(to: inner)
-            context.strokePath()
-        }
-
-        context.restoreGState()
-    }
-
-    private static func drawStarMedallions(
-        center: CGPoint,
-        radius: CGFloat,
-        color: NSColor,
-        lineWidth: CGFloat,
-        in context: CGContext
-    ) {
-        context.saveGState()
-        context.setStrokeColor(color.cgColor)
-        context.setFillColor(color.withAlphaComponent(0.92).cgColor)
-        context.setLineWidth(lineWidth)
-
-        for index in 0..<4 {
-            let angle = -.pi / 2 + CGFloat(index) * .pi / 2
-            let medallionCenter = point(center: center, radius: radius, angle: angle)
-            let medallionRadius = lineWidth * 3.0
-            strokeCircle(center: medallionCenter, radius: medallionRadius, in: context)
-            drawStar(center: medallionCenter, radius: medallionRadius * 0.58, color: color, in: context)
-        }
-
-        context.restoreGState()
-    }
-
-    private static func drawStar(center: CGPoint, radius: CGFloat, color: NSColor, in context: CGContext) {
-        context.saveGState()
-        context.setFillColor(color.cgColor)
-        context.beginPath()
-        for index in 0..<10 {
-            let angle = -.pi / 2 + CGFloat(index) * .pi / 5
-            let pointRadius = index.isMultiple(of: 2) ? radius : radius * 0.42
-            let starPoint = point(center: center, radius: pointRadius, angle: angle)
-            if index == 0 {
-                context.move(to: starPoint)
-            } else {
-                context.addLine(to: starPoint)
-            }
-        }
-        context.closePath()
+        context.addPath(path)
+        context.setFillColor(NSColor.black.cgColor)
         context.fillPath()
         context.restoreGState()
     }
 
-    private static func drawTriangleOverlays(
-        center: CGPoint,
-        radius: CGFloat,
-        color: NSColor,
-        lineWidth: CGFloat,
-        in context: CGContext
-    ) {
-        context.saveGState()
-        context.setStrokeColor(color.cgColor)
-        context.setLineWidth(lineWidth)
-        context.setLineJoin(.round)
+    private static func drawBackground(in rect: CGRect, context: CGContext) {
+        let background = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: [
+                NSColor(calibratedRed: 0.015, green: 0.018, blue: 0.020, alpha: 1).cgColor,
+                NSColor(calibratedRed: 0.036, green: 0.065, blue: 0.053, alpha: 1).cgColor,
+                NSColor(calibratedRed: 0.010, green: 0.015, blue: 0.016, alpha: 1).cgColor
+            ] as CFArray,
+            locations: [0.0, 0.55, 1.0]
+        )
 
-        let left = point(center: center, radius: radius * 0.60, angle: .pi)
-        let right = point(center: center, radius: radius * 0.60, angle: 0)
-        let top = point(center: center, radius: radius * 0.64, angle: -.pi / 2)
-        let bottom = point(center: center, radius: radius * 0.64, angle: .pi / 2)
-
-        context.beginPath()
-        context.move(to: left)
-        context.addLine(to: top)
-        context.addLine(to: right)
-        context.move(to: left)
-        context.addLine(to: bottom)
-        context.addLine(to: right)
-        context.strokePath()
-
-        context.restoreGState()
-    }
-
-    private static func drawSmallStars(center: CGPoint, radius: CGFloat, color: NSColor, in context: CGContext) {
-        context.saveGState()
-        context.setFillColor(color.cgColor)
-
-        for index in 0..<8 {
-            let angle = CGFloat(index) * 2 * .pi / 8 + .pi / 8
-            let starCenter = point(center: center, radius: radius, angle: angle)
-            drawStar(center: starCenter, radius: radius * 0.028, color: color, in: context)
+        if let background {
+            context.drawLinearGradient(
+                background,
+                start: CGPoint(x: rect.minX, y: rect.maxY),
+                end: CGPoint(x: rect.maxX, y: rect.minY),
+                options: []
+            )
         }
 
-        context.restoreGState()
+        context.setFillColor(NSColor(calibratedWhite: 1, alpha: 0.035).cgColor)
+        context.fill(
+            CGRect(
+                x: rect.minX,
+                y: rect.maxY - rect.height * 0.30,
+                width: rect.width,
+                height: rect.height * 0.30
+            )
+        )
     }
 
-    private static func drawFlowingRibbons(center: CGPoint, radius: CGFloat, color: NSColor, lineWidth: CGFloat) {
-        guard let context = NSGraphicsContext.current?.cgContext else {
+    private static func drawCornerGlow(in rect: CGRect, context: CGContext) {
+        let glow = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: [
+                NSColor(calibratedRed: 0.21, green: 0.96, blue: 0.47, alpha: 0.45).cgColor,
+                NSColor(calibratedRed: 0.11, green: 0.60, blue: 0.30, alpha: 0.12).cgColor,
+                NSColor(calibratedRed: 0.11, green: 0.60, blue: 0.30, alpha: 0.0).cgColor
+            ] as CFArray,
+            locations: [0.0, 0.42, 1.0]
+        )
+
+        guard let glow else {
             return
         }
 
-        context.saveGState()
-        context.setStrokeColor(color.withAlphaComponent(0.12).cgColor)
-        context.setLineWidth(lineWidth * 0.58)
-        context.setLineCap(.round)
-        context.setShadow(
-            offset: .zero,
-            blur: lineWidth * 2.6,
-            color: color.withAlphaComponent(0.14).cgColor
+        context.drawRadialGradient(
+            glow,
+            startCenter: CGPoint(x: rect.maxX - rect.width * 0.23, y: rect.minY + rect.height * 0.26),
+            startRadius: 0,
+            endCenter: CGPoint(x: rect.maxX - rect.width * 0.23, y: rect.minY + rect.height * 0.26),
+            endRadius: rect.width * 0.54,
+            options: [.drawsAfterEndLocation]
         )
-
-        for index in 0..<2 {
-            let verticalOffset = CGFloat(index == 0 ? -1 : 1) * radius * 0.16
-            context.beginPath()
-            context.move(to: CGPoint(x: center.x - radius * 1.05, y: center.y + verticalOffset))
-            context.addCurve(
-                to: CGPoint(x: center.x + radius * 1.05, y: center.y - verticalOffset * 0.7),
-                control1: CGPoint(x: center.x - radius * 0.35, y: center.y - radius * 0.45 + verticalOffset),
-                control2: CGPoint(x: center.x + radius * 0.35, y: center.y + radius * 0.45 - verticalOffset)
-            )
-            context.strokePath()
-        }
-
-        context.restoreGState()
     }
 
-    private static func point(center: CGPoint, radius: CGFloat, angle: CGFloat) -> CGPoint {
-        CGPoint(
-            x: center.x + cos(angle) * radius,
-            y: center.y + sin(angle) * radius
+    private static func drawTerminalPanel(in rect: CGRect, context: CGContext) {
+        let panel = CGRect(
+            x: rect.minX + rect.width * 0.165,
+            y: rect.minY + rect.height * 0.265,
+            width: rect.width * 0.67,
+            height: rect.height * 0.47
         )
+        let panelPath = CGPath(
+            roundedRect: panel,
+            cornerWidth: rect.width * 0.070,
+            cornerHeight: rect.width * 0.070,
+            transform: nil
+        )
+
+        context.saveGState()
+        context.setShadow(
+            offset: CGSize(width: 0, height: -8),
+            blur: rect.width * 0.055,
+            color: NSColor(calibratedRed: 0.0, green: 0.0, blue: 0.0, alpha: 0.45).cgColor
+        )
+        context.addPath(panelPath)
+        context.setFillColor(NSColor(calibratedRed: 0.018, green: 0.023, blue: 0.024, alpha: 0.96).cgColor)
+        context.fillPath()
+        context.restoreGState()
+
+        context.saveGState()
+        context.addPath(panelPath)
+        context.setStrokeColor(NSColor(calibratedRed: 0.22, green: 0.95, blue: 0.48, alpha: 0.56).cgColor)
+        context.setLineWidth(rect.width * 0.009)
+        context.strokePath()
+        context.restoreGState()
+
+        drawWindowDots(in: panel, context: context)
+
+        let promptRect = CGRect(
+            x: panel.minX + panel.width * 0.18,
+            y: panel.minY + panel.height * 0.28,
+            width: panel.width * 0.64,
+            height: panel.height * 0.46
+        )
+        drawPromptMark(
+            in: promptRect,
+            color: .white,
+            lineWidth: rect.width * 0.043,
+            glow: NSColor(calibratedRed: 0.22, green: 1.0, blue: 0.50, alpha: 0.32),
+            context: context
+        )
+    }
+
+    private static func drawWindowDots(in panel: CGRect, context: CGContext) {
+        let dotRadius = panel.width * 0.027
+        let y = panel.maxY - panel.height * 0.18
+        let colors = [
+            NSColor(calibratedRed: 0.24, green: 0.92, blue: 0.45, alpha: 0.62),
+            NSColor(calibratedWhite: 1, alpha: 0.28),
+            NSColor(calibratedWhite: 1, alpha: 0.18)
+        ]
+
+        for index in 0..<3 {
+            let center = CGPoint(
+                x: panel.minX + panel.width * 0.12 + CGFloat(index) * dotRadius * 2.65,
+                y: y
+            )
+            context.setFillColor(colors[index].cgColor)
+            context.fillEllipse(
+                in: CGRect(
+                    x: center.x - dotRadius,
+                    y: center.y - dotRadius,
+                    width: dotRadius * 2,
+                    height: dotRadius * 2
+                )
+            )
+        }
+    }
+
+    private static func drawPromptMark(
+        in rect: CGRect,
+        color: NSColor,
+        lineWidth: CGFloat,
+        glow: NSColor?,
+        context: CGContext
+    ) {
+        context.saveGState()
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        context.setLineWidth(lineWidth)
+        context.setStrokeColor(color.cgColor)
+        if let glow {
+            context.setShadow(offset: .zero, blur: lineWidth * 2.1, color: glow.cgColor)
+        }
+
+        let leftX = rect.minX + rect.width * 0.08
+        let pointX = rect.minX + rect.width * 0.40
+        let topY = rect.maxY - rect.height * 0.16
+        let midY = rect.midY + rect.height * 0.02
+        let bottomY = rect.minY + rect.height * 0.18
+
+        context.beginPath()
+        context.move(to: CGPoint(x: leftX, y: topY))
+        context.addLine(to: CGPoint(x: pointX, y: midY))
+        context.addLine(to: CGPoint(x: leftX, y: bottomY))
+        context.strokePath()
+
+        context.beginPath()
+        context.move(to: CGPoint(x: rect.minX + rect.width * 0.54, y: bottomY))
+        context.addLine(to: CGPoint(x: rect.maxX - rect.width * 0.08, y: bottomY))
+        context.strokePath()
+
+        context.restoreGState()
     }
 
     private static func writePNG(_ bitmap: NSBitmapImageRep, to url: URL) throws {
