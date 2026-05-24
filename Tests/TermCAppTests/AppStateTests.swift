@@ -82,7 +82,7 @@ import TermCCore
 }
 
 @MainActor
-@Test func refreshRemoteFilesPromptsForSFTPCredentialWhenTerminalUsedManualPassword() async {
+@Test func refreshRemoteFilesDoesNotPromptForSFTPCredentialWhenTerminalUsedManualPassword() async {
     let connection = ConnectionRecord(
         alias: "Manual",
         host: "manual.example.com",
@@ -111,10 +111,80 @@ import TermCCore
 
     await state.refreshRemoteFiles()
 
-    #expect(state.pendingSFTPCredentialPrompt?.tabID == tab.id)
-    #expect(state.pendingSFTPCredentialPrompt?.connection == connection)
+    #expect(state.pendingSFTPCredentialPrompt == nil)
     #expect(state.notification == nil)
     #expect(state.remoteFiles.isEmpty)
+}
+
+@MainActor
+@Test func connectSFTPForSelectedTabPromptsWhenManualPasswordConnectionHasNoSavedCredential() async {
+    let connection = ConnectionRecord(
+        alias: "Manual",
+        host: "manual.example.com",
+        username: "deploy",
+        authentication: .password,
+        defaultRemotePath: "/srv"
+    )
+    let tab = TerminalTab(
+        title: "Manual",
+        state: .connected,
+        transcript: "",
+        remotePath: "/srv",
+        session: LocalSSHOnlySession(record: connection)
+    )
+    let state = AppState(
+        tabs: [tab],
+        connections: [],
+        credentialStore: InMemoryCredentialStore()
+    )
+    state.selectedTabID = tab.id
+    state.remotePath = "/srv"
+
+    await state.connectSFTPForSelectedTab()
+
+    #expect(state.pendingSFTPCredentialPrompt?.tabID == tab.id)
+    #expect(state.pendingSFTPCredentialPrompt?.connection == connection)
+    #expect(state.remoteFiles.isEmpty)
+}
+
+@MainActor
+@Test func connectSFTPForSelectedTabUsesSavedPasswordForManualConnection() async {
+    let connection = ConnectionRecord(
+        alias: "Manual",
+        host: "manual.example.com",
+        username: "deploy",
+        authentication: .password,
+        defaultRemotePath: "/srv"
+    )
+    let tab = TerminalTab(
+        title: "Manual",
+        state: .connected,
+        transcript: "",
+        remotePath: "/srv",
+        session: LocalSSHOnlySession(record: connection)
+    )
+    let credentialStore = InMemoryCredentialStore()
+    try? await credentialStore.save(.password("secret"), for: connection.id)
+    let sshClient = RecordingSSHClient()
+    let sftpService = RecordingSFTPService(filesByPath: [
+        "/srv": [RemoteFile(name: "app.log", path: "/srv/app.log", kind: .file, size: 5)]
+    ])
+    let state = AppState(
+        tabs: [tab],
+        connections: [],
+        sshClient: sshClient,
+        credentialStore: credentialStore,
+        sftpService: sftpService
+    )
+    state.selectedTabID = tab.id
+    state.remotePath = "/srv"
+
+    await state.connectSFTPForSelectedTab()
+
+    #expect(await sshClient.credentials == [.password("secret")])
+    #expect(state.pendingSFTPCredentialPrompt == nil)
+    #expect(state.remoteFiles == [RemoteFile(name: "app.log", path: "/srv/app.log", kind: .file, size: 5)])
+    #expect(await sftpService.listedPaths == ["/srv"])
 }
 
 @MainActor
@@ -145,7 +215,7 @@ import TermCCore
     )
     state.selectedTabID = tab.id
     state.remotePath = "/srv"
-    await state.refreshRemoteFiles()
+    await state.connectSFTPForSelectedTab()
 
     await state.submitSFTPCredential(password: "secret")
 
@@ -265,6 +335,7 @@ import TermCCore
     state.draftUsername = "deploy"
     state.draftPassword = " \n "
     state.draftPrivateKeyPassphrase = "stale-key-passphrase"
+    state.draftDefaultRemotePath = " /srv "
 
     await state.connectDraftConnection()
 
@@ -274,6 +345,8 @@ import TermCCore
     #expect(state.tabs.last?.localProcess == .ssh(connection, credential: nil))
     let savedCredential = try? await credentialStore.load(for: connection.id)
     #expect(savedCredential == nil)
+    #expect(state.remotePath == "/srv")
+    #expect(state.tabs.last?.remotePath == "/srv")
     #expect(state.remoteFiles.isEmpty)
 }
 

@@ -20,6 +20,21 @@ struct SFTPDrawerView: View {
 
                 Spacer()
 
+                if state.selectedSFTPCredentialConnection != nil {
+                    Button {
+                        Task {
+                            await state.connectSFTPForSelectedTab()
+                        }
+                    } label: {
+                        Label(state.t.connectSFTP, systemImage: "link")
+                            .labelStyle(.titleAndIcon)
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                    .foregroundStyle(.white)
+                    .help(state.t.connectSFTP)
+                }
+
                 Button {
                     Task {
                         await state.refreshRemoteFiles()

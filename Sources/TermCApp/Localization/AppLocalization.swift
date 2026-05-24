@@ -119,6 +119,7 @@ struct AppStrings: Equatable, Sendable {
     var largerFont: String { self["largerFont"] }
     var fontSize: String { self["fontSize"] }
     var refresh: String { self["refresh"] }
+    var connectSFTP: String { self["connectSFTP"] }
     var parentDirectory: String { self["parentDirectory"] }
     var remotePath: String { self["remotePath"] }
     var uploadHere: String { self["uploadHere"] }
@@ -189,6 +190,7 @@ struct AppStrings: Equatable, Sendable {
             "usePrivateKey", "privateKeyPath", "password", "keepConnectionAlive", "jumpHost",
             "portForwarding", "trustHostKeyTitle", "toggleConnections", "commandSnippets",
             "listFiles", "diskUsage", "memoryUsage", "serverStatus", "fontSize", "refresh",
+            "connectSFTP",
             "parentDirectory", "remotePath", "newFolder", "renameTab", "copy", "paste",
             "showTermTP", "quitTermTP", "welcomeTitle", "connectingTo", "connectedTo",
             "failedToConnect", "noActiveSSHSession"

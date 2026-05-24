@@ -226,7 +226,7 @@ extension AppState {
             )
             attachSession(LocalSSHOnlySession(record: connection), to: tab.id)
             attachLocalSSHProcess(to: tab.id, connection: connection, credential: credential)
-            await refreshRemoteFiles()
+            updateRemoteFiles([], path: remotePath, tabID: tab.id)
             return
         }
 

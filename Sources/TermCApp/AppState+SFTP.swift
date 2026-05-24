@@ -21,9 +21,7 @@ extension AppState {
         path: String,
         session: SSHSessionProviding
     ) async {
-        if let connection = session.sftpCredentialConnection,
-           connection.authentication.kind == .password {
-            requestSFTPCredential(tabID: tabID, connection: connection, path: path)
+        if session.sftpCredentialConnection != nil {
             updateRemoteFiles([], path: path, tabID: tabID)
             return
         }
@@ -36,6 +34,42 @@ extension AppState {
             showNotification(kind: .warning, message: t.sftpUnsupportedForConnection)
         } catch {
             updateRemoteFiles([], path: path, tabID: tabID)
+            showNotification(kind: .error, message: t.sftpRefreshFailed(String(describing: error)))
+        }
+    }
+
+    func connectSFTPForSelectedTab() async {
+        saveRemotePathForSelectedTab()
+
+        guard
+            let selectedTabID,
+            let session = selectedSession
+        else {
+            remoteFiles = []
+            return
+        }
+
+        guard
+            let connection = session.sftpCredentialConnection,
+            connection.authentication.kind == .password
+        else {
+            await refreshRemoteFiles(tabID: selectedTabID, path: remotePath, session: session)
+            return
+        }
+
+        do {
+            guard let credential = try await credentialStore.load(for: connection.id) else {
+                requestSFTPCredential(tabID: selectedTabID, connection: connection, path: remotePath)
+                updateRemoteFiles([], path: remotePath, tabID: selectedTabID)
+                return
+            }
+
+            let sftpSession = try await connectWithTimeout(record: connection, credential: credential)
+            attachSession(sftpSession, to: selectedTabID)
+            pendingSFTPCredentialPrompt = nil
+            await refreshRemoteFiles(tabID: selectedTabID, path: remotePath, session: sftpSession)
+        } catch {
+            updateRemoteFiles([], path: remotePath, tabID: selectedTabID)
             showNotification(kind: .error, message: t.sftpRefreshFailed(String(describing: error)))
         }
     }
@@ -296,6 +330,10 @@ extension AppState {
         }
 
         return sftpContext(for: selectedTabID)
+    }
+
+    var selectedSFTPCredentialConnection: ConnectionRecord? {
+        selectedSession?.sftpCredentialConnection
     }
 
     func sftpContext(for tabID: TerminalTab.ID) -> SFTPContext? {
