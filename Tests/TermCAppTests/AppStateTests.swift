@@ -1434,3 +1434,11 @@ private func writeFakeDownload(to path: String, offset: Int64, totalBytes: Int64
     #expect(AppLayout.connectionSidebarWidth == 190)
     #expect(AppLayout.transferDrawerHeight == 260)
 }
+
+@MainActor
+@Test func sidebarActionButtonsUseReadableDarkThemeColors() {
+    #expect(ConnectionSidebarActionStyle.textOpacity == 0.92)
+    #expect(ConnectionSidebarActionStyle.backgroundOpacity == 0.07)
+    #expect(ConnectionSidebarActionStyle.borderOpacity == 0.12)
+    #expect(ConnectionSidebarActionStyle.cornerRadius == 6)
+}

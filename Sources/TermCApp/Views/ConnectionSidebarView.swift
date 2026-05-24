@@ -96,18 +96,16 @@ struct ConnectionSidebarView: View {
                     importConnections()
                 } label: {
                     Label(state.t.importConnections, systemImage: "square.and.arrow.down")
-                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(ConnectionSidebarActionStyle())
                 .controlSize(.small)
 
                 Button {
                     exportConnections()
                 } label: {
                     Label(state.t.exportConnections, systemImage: "square.and.arrow.up")
-                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(ConnectionSidebarActionStyle())
                 .controlSize(.small)
             }
 
@@ -115,19 +113,8 @@ struct ConnectionSidebarView: View {
                 state.clearHistory()
             } label: {
                 Text(state.t.clearHistory)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                    }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ConnectionSidebarActionStyle(alignment: .leading))
         }
         .padding(10)
         .frame(maxHeight: .infinity, alignment: .top)
@@ -230,6 +217,36 @@ struct ConnectionSidebarView: View {
         } catch {
             state.showNotification(kind: .error, message: state.t.exportConnectionsFailed(String(describing: error)))
         }
+    }
+}
+
+struct ConnectionSidebarActionStyle: ButtonStyle {
+    static let textOpacity = 0.92
+    static let backgroundOpacity = 0.07
+    static let pressedBackgroundOpacity = 0.13
+    static let borderOpacity = 0.12
+    static let cornerRadius: CGFloat = 6
+
+    var alignment: Alignment = .center
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.caption)
+            .fontWeight(.medium)
+            .foregroundStyle(Color.white.opacity(Self.textOpacity))
+            .frame(maxWidth: .infinity, alignment: alignment)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                Color.white.opacity(
+                    configuration.isPressed ? Self.pressedBackgroundOpacity : Self.backgroundOpacity
+                ),
+                in: RoundedRectangle(cornerRadius: Self.cornerRadius)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: Self.cornerRadius)
+                    .stroke(Color.white.opacity(Self.borderOpacity), lineWidth: 1)
+            }
     }
 }
 
