@@ -389,6 +389,21 @@ import TermCCore
 }
 
 @MainActor
+@Test func clearTrustedHostKeysAlsoClearsLocalSSHKnownHostsFile() throws {
+    let state = AppState(connections: [])
+    let knownHostsURL = TermTPKnownHostsFile.defaultFileURL
+    try FileManager.default.createDirectory(
+        at: knownHostsURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    try "example.com ssh-ed25519 AAAATEST\n".write(to: knownHostsURL, atomically: true, encoding: .utf8)
+
+    state.clearTrustedHostKeys()
+
+    #expect(!FileManager.default.fileExists(atPath: knownHostsURL.path))
+}
+
+@MainActor
 @Test func connectDraftConnectionFailsAfterTimeout() async {
     let state = AppState(
         connections: [],

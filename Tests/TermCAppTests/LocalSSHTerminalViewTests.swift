@@ -21,6 +21,7 @@ import TermCCore
     #expect(launch.environment?.contains("SSH_ASKPASS=\(askPassScriptPath)") == true)
     #expect(launch.environment?.contains("TERMTP_SSH_PASSWORD=secret") == false)
     #expect(launch.environment?.contains("TERMTP_SSH_PASSWORD_FILE=/tmp/termtp-test-askpass/password") == true)
+    #expect(launch.args.contains("StrictHostKeyChecking=accept-new"))
 }
 
 @MainActor
@@ -88,7 +89,7 @@ import TermCCore
     #expect(launch.args.contains("127.0.0.1:8080:localhost:80"))
     #expect(launch.args.suffix(7) == [
         "-o",
-        "StrictHostKeyChecking=accept-new",
+        "StrictHostKeyChecking=ask",
         "-o",
         "UserKnownHostsFile=\(LocalSSHTerminalView.knownHostsFileURL.path)",
         "-p",
@@ -98,7 +99,7 @@ import TermCCore
 }
 
 @MainActor
-@Test func launchArgumentsUseTermTPKnownHostsFile() {
+@Test func manualLaunchArgumentsAskBeforeSavingUnknownHostKeyAndUseTermTPKnownHostsFile() {
     let launch = LocalSSHTerminalView.launchConfiguration(
         for: ConnectionRecord.samplePassword,
         credential: nil
@@ -106,7 +107,7 @@ import TermCCore
 
     #expect(launch.args.suffix(7) == [
         "-o",
-        "StrictHostKeyChecking=accept-new",
+        "StrictHostKeyChecking=ask",
         "-o",
         "UserKnownHostsFile=\(LocalSSHTerminalView.knownHostsFileURL.path)",
         "-p",

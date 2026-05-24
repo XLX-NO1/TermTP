@@ -1,3 +1,4 @@
+import Foundation
 import TermCCore
 
 extension AppState {
@@ -21,6 +22,7 @@ extension AppState {
 
     func clearTrustedHostKeys() {
         hostKeyTrustStore.clearTrustedKeys()
+        try? FileManager.default.removeItem(at: TermTPKnownHostsFile.defaultFileURL)
         trustedHostKeyRevision += 1
     }
 

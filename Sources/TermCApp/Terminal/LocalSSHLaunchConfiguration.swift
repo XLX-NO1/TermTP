@@ -34,7 +34,7 @@ extension LocalSSHTerminalView {
         guard needsAskPassScript(for: credential) else {
             return LaunchConfiguration(
                 executable: "/usr/bin/ssh",
-                args: sshArguments(for: connection),
+                args: sshArguments(for: connection, promptsForUnknownHostKey: true),
                 environment: terminalEnvironment(additionalValues: [:])
             )
         }
@@ -42,7 +42,7 @@ extension LocalSSHTerminalView {
         let askPass = askPass ?? makeAskPassBundle(password: password(from: credential) ?? "")
         return LaunchConfiguration(
             executable: "/usr/bin/ssh",
-            args: sshArguments(for: connection),
+            args: sshArguments(for: connection, promptsForUnknownHostKey: false),
             environment: terminalEnvironment(additionalValues: [
                 "TERMTP_SSH_PASSWORD_FILE": askPass.passwordFilePath,
                 "SSH_ASKPASS": askPass.scriptPath,
@@ -53,10 +53,7 @@ extension LocalSSHTerminalView {
     }
 
     static var knownHostsFileURL: URL {
-        FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("TermTP", isDirectory: true)
-            .appendingPathComponent("known_hosts")
+        TermTPKnownHostsFile.defaultFileURL
     }
 
     static func prepareKnownHostsFile() {
@@ -131,13 +128,20 @@ extension LocalSSHTerminalView {
             .map { "\($0.key)=\($0.value)" }
     }
 
-    private static func sshArguments(for connection: ConnectionRecord) -> [String] {
+    private static func sshArguments(
+        for connection: ConnectionRecord,
+        promptsForUnknownHostKey: Bool
+    ) -> [String] {
         var args = [
             "-o", "StrictHostKeyChecking=accept-new",
             "-o", "UserKnownHostsFile=\(knownHostsFileURL.path)",
             "-p", String(connection.port),
             "\(connection.username)@\(connection.host)"
         ]
+
+        if promptsForUnknownHostKey {
+            args[1] = "StrictHostKeyChecking=ask"
+        }
 
         if case .publicKey(let privateKeyPath) = connection.authentication {
             args.insert(contentsOf: ["-i", privateKeyPath], at: 0)
