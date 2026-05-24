@@ -66,6 +66,9 @@ struct RootView: View {
         .sheet(isPresented: $state.isSettingsPresented) {
             SettingsView(state: state)
         }
+        .sheet(item: $state.pendingSFTPCredentialPrompt) { prompt in
+            SFTPCredentialPromptView(state: state, prompt: prompt)
+        }
         .alert(
             state.t.trustHostKeyTitle,
             isPresented: Binding(

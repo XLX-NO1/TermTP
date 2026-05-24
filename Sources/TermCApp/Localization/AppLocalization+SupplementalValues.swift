@@ -84,6 +84,8 @@ extension AppStrings {
             "failedToConnect": "接続に失敗しました",
             "noActiveSSHSession": "有効な SSH セッションがありません",
             "sftpUnsupportedForConnection": "この接続では SFTP ファイル管理を使用できません",
+            "sftpPasswordTitle": "SFTP パスワードを入力",
+            "sftpPasswordMessage": "ターミナルは接続済みです。下のファイル管理を有効にするため、パスワードを一度入力してください。",
             "sftpRefreshFailedFormat": "リモートファイルの更新に失敗しました: %@",
             "connectionTimedOutFormat": "接続が %@ 秒でタイムアウトしました"
         ],
@@ -169,6 +171,8 @@ extension AppStrings {
             "failedToConnect": "연결 실패",
             "noActiveSSHSession": "활성 SSH 세션이 없습니다",
             "sftpUnsupportedForConnection": "이 연결은 SFTP 파일 관리를 지원하지 않습니다",
+            "sftpPasswordTitle": "SFTP 비밀번호 입력",
+            "sftpPasswordMessage": "터미널은 연결되어 있습니다. 아래 파일 관리를 사용하려면 비밀번호를 한 번 입력하세요.",
             "sftpRefreshFailedFormat": "원격 파일 새로고침 실패: %@",
             "connectionTimedOutFormat": "%@초 후 연결 시간이 초과되었습니다"
         ],
@@ -252,6 +256,8 @@ extension AppStrings {
             "failedToConnect": "No se pudo conectar a",
             "noActiveSSHSession": "No hay sesión SSH activa",
             "sftpUnsupportedForConnection": "Esta conexión no admite gestión de archivos SFTP",
+            "sftpPasswordTitle": "Introduce la contraseña SFTP",
+            "sftpPasswordMessage": "La terminal ya está conectada. Introduce la contraseña una vez para activar la gestión de archivos.",
             "sftpRefreshFailedFormat": "No se pudieron actualizar los archivos remotos: %@",
             "connectionTimedOutFormat": "La conexión agotó el tiempo tras %@ segundos"
         ],
@@ -337,6 +343,8 @@ extension AppStrings {
             "failedToConnect": "Échec de connexion à",
             "noActiveSSHSession": "Aucune session SSH active",
             "sftpUnsupportedForConnection": "Cette connexion ne prend pas en charge la gestion de fichiers SFTP",
+            "sftpPasswordTitle": "Saisir le mot de passe SFTP",
+            "sftpPasswordMessage": "Le terminal est connecté. Saisissez le mot de passe une fois pour activer la gestion de fichiers.",
             "sftpRefreshFailedFormat": "Échec de l’actualisation des fichiers distants : %@",
             "connectionTimedOutFormat": "Connexion expirée après %@ secondes"
         ],
@@ -422,6 +430,8 @@ extension AppStrings {
             "failedToConnect": "Keine Verbindung zu",
             "noActiveSSHSession": "Keine aktive SSH-Sitzung",
             "sftpUnsupportedForConnection": "Diese Verbindung unterstützt keine SFTP-Dateiverwaltung",
+            "sftpPasswordTitle": "SFTP-Passwort eingeben",
+            "sftpPasswordMessage": "Das Terminal ist verbunden. Geben Sie das Passwort einmal ein, um die Dateiverwaltung zu aktivieren.",
             "sftpRefreshFailedFormat": "Remotedateien konnten nicht aktualisiert werden: %@",
             "connectionTimedOutFormat": "Verbindung nach %@ Sekunden abgelaufen"
         ],
@@ -507,6 +517,8 @@ extension AppStrings {
             "failedToConnect": "Не удалось подключиться к",
             "noActiveSSHSession": "Нет активного SSH-сеанса",
             "sftpUnsupportedForConnection": "Это подключение не поддерживает управление файлами SFTP",
+            "sftpPasswordTitle": "Введите пароль SFTP",
+            "sftpPasswordMessage": "Терминал подключён. Введите пароль один раз, чтобы включить управление файлами.",
             "sftpRefreshFailedFormat": "Не удалось обновить удалённые файлы: %@",
             "connectionTimedOutFormat": "Время подключения истекло через %@ секунд"
         ],
@@ -592,6 +604,8 @@ extension AppStrings {
             "failedToConnect": "Falha ao conectar a",
             "noActiveSSHSession": "Nenhuma sessão SSH ativa",
             "sftpUnsupportedForConnection": "Esta conexão não oferece suporte ao gerenciamento de arquivos SFTP",
+            "sftpPasswordTitle": "Digite a senha SFTP",
+            "sftpPasswordMessage": "O terminal está conectado. Digite a senha uma vez para ativar o gerenciamento de arquivos.",
             "sftpRefreshFailedFormat": "Falha ao atualizar arquivos remotos: %@",
             "connectionTimedOutFormat": "A conexão expirou após %@ segundos"
         ]

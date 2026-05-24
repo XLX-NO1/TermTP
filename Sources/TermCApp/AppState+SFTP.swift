@@ -21,6 +21,13 @@ extension AppState {
         path: String,
         session: SSHSessionProviding
     ) async {
+        if let connection = session.sftpCredentialConnection,
+           connection.authentication.kind == .password {
+            requestSFTPCredential(tabID: tabID, connection: connection, path: path)
+            updateRemoteFiles([], path: path, tabID: tabID)
+            return
+        }
+
         do {
             let files = try await sftpService.list(path: path, session: session)
             updateRemoteFiles(files, path: path, tabID: tabID)
@@ -31,6 +38,44 @@ extension AppState {
             updateRemoteFiles([], path: path, tabID: tabID)
             showNotification(kind: .error, message: t.sftpRefreshFailed(String(describing: error)))
         }
+    }
+
+    func requestSFTPCredential(tabID: TerminalTab.ID, connection: ConnectionRecord, path: String) {
+        guard pendingSFTPCredentialPrompt?.tabID != tabID else {
+            return
+        }
+
+        pendingSFTPCredentialPrompt = SFTPCredentialPrompt(
+            tabID: tabID,
+            connection: connection,
+            path: path
+        )
+    }
+
+    func submitSFTPCredential(password: String) async {
+        guard let prompt = pendingSFTPCredentialPrompt else {
+            return
+        }
+
+        let trimmedPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPassword.isEmpty else {
+            return
+        }
+
+        do {
+            let credential = Credential.password(trimmedPassword)
+            let session = try await connectWithTimeout(record: prompt.connection, credential: credential)
+            try? await credentialStore.save(credential, for: prompt.connection.id)
+            attachSession(session, to: prompt.tabID)
+            pendingSFTPCredentialPrompt = nil
+            await refreshRemoteFiles(tabID: prompt.tabID, path: prompt.path, session: session)
+        } catch {
+            showNotification(kind: .error, message: t.sftpRefreshFailed(String(describing: error)))
+        }
+    }
+
+    func cancelSFTPCredentialPrompt() {
+        pendingSFTPCredentialPrompt = nil
     }
 
     func openRemoteDirectory(_ file: RemoteFile) async {

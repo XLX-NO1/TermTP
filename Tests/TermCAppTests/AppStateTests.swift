@@ -82,6 +82,80 @@ import TermCCore
 }
 
 @MainActor
+@Test func refreshRemoteFilesPromptsForSFTPCredentialWhenTerminalUsedManualPassword() async {
+    let connection = ConnectionRecord(
+        alias: "Manual",
+        host: "manual.example.com",
+        username: "deploy",
+        authentication: .password,
+        defaultRemotePath: "/srv"
+    )
+    let tab = TerminalTab(
+        title: "Manual",
+        state: .connected,
+        transcript: "",
+        remotePath: "/srv",
+        session: LocalSSHOnlySession(record: connection)
+    )
+    let state = AppState(
+        tabs: [tab],
+        connections: [],
+        language: .zhHans,
+        sshClient: RecordingSSHClient(),
+        sftpService: RecordingSFTPService(filesByPath: [
+            "/srv": [RemoteFile(name: "app.log", path: "/srv/app.log", kind: .file, size: 5)]
+        ])
+    )
+    state.selectedTabID = tab.id
+    state.remotePath = "/srv"
+
+    await state.refreshRemoteFiles()
+
+    #expect(state.pendingSFTPCredentialPrompt?.tabID == tab.id)
+    #expect(state.pendingSFTPCredentialPrompt?.connection == connection)
+    #expect(state.notification == nil)
+    #expect(state.remoteFiles.isEmpty)
+}
+
+@MainActor
+@Test func submitSFTPCredentialCreatesFileManagementSessionForManualPasswordConnection() async {
+    let connection = ConnectionRecord(
+        alias: "Manual",
+        host: "manual.example.com",
+        username: "deploy",
+        authentication: .password,
+        defaultRemotePath: "/srv"
+    )
+    let tab = TerminalTab(
+        title: "Manual",
+        state: .connected,
+        transcript: "",
+        remotePath: "/srv",
+        session: LocalSSHOnlySession(record: connection)
+    )
+    let sshClient = RecordingSSHClient()
+    let sftpService = RecordingSFTPService(filesByPath: [
+        "/srv": [RemoteFile(name: "app.log", path: "/srv/app.log", kind: .file, size: 5)]
+    ])
+    let state = AppState(
+        tabs: [tab],
+        connections: [],
+        sshClient: sshClient,
+        sftpService: sftpService
+    )
+    state.selectedTabID = tab.id
+    state.remotePath = "/srv"
+    await state.refreshRemoteFiles()
+
+    await state.submitSFTPCredential(password: "secret")
+
+    #expect(await sshClient.credentials == [.password("secret")])
+    #expect(state.pendingSFTPCredentialPrompt == nil)
+    #expect(state.remoteFiles == [RemoteFile(name: "app.log", path: "/srv/app.log", kind: .file, size: 5)])
+    #expect(await sftpService.listedPaths == ["/srv"])
+}
+
+@MainActor
 @Test func menuBarTemplateImageFallsBackWhenResourceIsMissing() {
     let image = MenuBarController.makeMenuBarTemplateImage()
 
@@ -1150,6 +1224,17 @@ private struct HangingSSHClient: SSHClientProviding {
 private struct FailingSSHClient: SSHClientProviding {
     func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
         throw SSHConnectionTimeoutError(message: "连接失败")
+    }
+}
+
+private actor RecordingSSHClient: SSHClientProviding {
+    private(set) var records: [ConnectionRecord] = []
+    private(set) var credentials: [Credential?] = []
+
+    func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
+        records.append(record)
+        credentials.append(credential)
+        return FakeSSHSession(record: record)
     }
 }
 

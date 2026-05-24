@@ -33,3 +33,9 @@ actor LocalSSHOnlySession: SSHSessionProviding {
 
     func disconnect() async throws {}
 }
+
+extension SSHSessionProviding {
+    var sftpCredentialConnection: ConnectionRecord? {
+        (self as? LocalSSHOnlySession)?.record
+    }
+}

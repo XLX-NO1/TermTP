@@ -114,6 +114,8 @@ extension AppStrings {
             "failedToConnect": "连接失败",
             "noActiveSSHSession": "没有可用的 SSH 会话",
             "sftpUnsupportedForConnection": "当前连接暂不支持 SFTP 文件管理",
+            "sftpPasswordTitle": "输入 SFTP 密码",
+            "sftpPasswordMessage": "终端已连接。请输入一次密码，用于打开下方文件管理。",
             "sftpRefreshFailedFormat": "刷新远程文件失败：%@",
             "connectionTimedOutFormat": "连接超时，已等待 %@ 秒"
         ],
@@ -229,6 +231,8 @@ extension AppStrings {
             "failedToConnect": "Failed to connect to",
             "noActiveSSHSession": "No active SSH session",
             "sftpUnsupportedForConnection": "SFTP file management is not supported for this connection",
+            "sftpPasswordTitle": "Enter SFTP Password",
+            "sftpPasswordMessage": "The terminal is connected. Enter the password once to enable file management below.",
             "sftpRefreshFailedFormat": "Failed to refresh remote files: %@",
             "connectionTimedOutFormat": "Connection timed out after %@ seconds"
         ],

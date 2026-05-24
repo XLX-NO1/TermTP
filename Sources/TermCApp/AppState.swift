@@ -80,6 +80,7 @@ final class AppState {
     var remotePath = "."
     var remoteFiles: [RemoteFile] = []
     var filePreview: RemoteFilePreview?
+    var pendingSFTPCredentialPrompt: SFTPCredentialPrompt?
     var trustedHostKeyRevision = 0
 
     var t: AppStrings {

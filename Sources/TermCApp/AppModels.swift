@@ -69,6 +69,13 @@ struct RemoteFilePreview: Identifiable, Equatable {
     var text: String
 }
 
+struct SFTPCredentialPrompt: Identifiable, Equatable {
+    var id = UUID()
+    var tabID: TerminalTab.ID
+    var connection: ConnectionRecord
+    var path: String
+}
+
 enum TerminalLocalProcess: Equatable {
     case ssh(ConnectionRecord, credential: Credential?)
 }
