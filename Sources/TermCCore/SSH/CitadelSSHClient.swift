@@ -30,6 +30,13 @@ public enum SSHClientAdapterError: Error, Equatable {
     case hostKeyVerificationRequired
 }
 
+public func isSSHAuthenticationFailure(_ error: any Error) -> Bool {
+    let description = String(describing: error)
+    return error is AuthenticationFailed
+        || description == "allAuthenticationOptionsFailed"
+        || description.contains("allAuthenticationOptionsFailed")
+}
+
 public enum SSHHostKeyPolicy: Equatable, Sendable {
     case strict
     case insecureAcceptAnyHostKey

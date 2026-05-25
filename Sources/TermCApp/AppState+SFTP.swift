@@ -70,6 +70,13 @@ extension AppState {
             await refreshRemoteFiles(tabID: selectedTabID, path: remotePath, session: sftpSession)
         } catch {
             updateRemoteFiles([], path: remotePath, tabID: selectedTabID)
+            if isSSHAuthenticationFailure(error) {
+                try? await credentialStore.delete(for: connection.id)
+                requestSFTPCredential(tabID: selectedTabID, connection: connection, path: remotePath)
+                showNotification(kind: .warning, message: t.authenticationFailedRetryPassword)
+                return
+            }
+
             showNotification(kind: .error, message: t.sftpRefreshFailed(String(describing: error)))
         }
     }
@@ -106,6 +113,13 @@ extension AppState {
             pendingSFTPCredentialPrompt = nil
             await refreshRemoteFiles(tabID: prompt.tabID, path: prompt.path, session: session)
         } catch {
+            if isSSHAuthenticationFailure(error) {
+                try? await credentialStore.delete(for: prompt.connection.id)
+                requestSFTPCredential(tabID: prompt.tabID, connection: prompt.connection, path: prompt.path)
+                showNotification(kind: .warning, message: t.authenticationFailedRetryPassword)
+                return
+            }
+
             showNotification(kind: .error, message: t.sftpRefreshFailed(String(describing: error)))
         }
     }

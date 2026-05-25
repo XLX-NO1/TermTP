@@ -266,6 +266,23 @@ extension AppState {
             attachLocalSSHProcess(to: tab.id, connection: connection, credential: credential)
             await refreshRemoteFiles()
         } catch {
+            if connection.authentication.kind == .password, credential != nil, isSSHAuthenticationFailure(error) {
+                try? await credentialStore.delete(for: connection.id)
+                updateTab(
+                    id: tab.id,
+                    state: .connected,
+                    transcript: """
+                    \(t.connectedTo) \(connection.username)@\(connection.host):\(connection.port)
+
+                    """
+                )
+                attachSession(LocalSSHOnlySession(record: connection), to: tab.id)
+                attachLocalSSHProcess(to: tab.id, connection: connection, credential: nil)
+                updateRemoteFiles([], path: remotePath, tabID: tab.id)
+                showNotification(kind: .warning, message: t.savedPasswordAuthenticationFailed)
+                return
+            }
+
             let message = String(describing: error)
             updateTab(
                 id: tab.id,

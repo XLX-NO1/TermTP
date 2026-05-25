@@ -119,6 +119,8 @@ extension AppStrings {
             "sftpPasswordTitle": "输入 SFTP 密码",
             "sftpPasswordMessage": "终端已连接。请输入一次密码，用于打开下方文件管理。",
             "savePassword": "保存密码",
+            "authenticationFailedRetryPassword": "认证失败，请重新输入密码",
+            "savedPasswordAuthenticationFailed": "保存的密码认证失败，请在终端中手动输入密码",
             "sftpRefreshFailedFormat": "刷新远程文件失败：%@",
             "connectionTimedOutFormat": "连接超时，已等待 %@ 秒"
         ],
@@ -239,6 +241,8 @@ extension AppStrings {
             "sftpPasswordTitle": "Enter SFTP Password",
             "sftpPasswordMessage": "The terminal is connected. Enter the password once to enable file management below.",
             "savePassword": "Save password",
+            "authenticationFailedRetryPassword": "Authentication failed. Please enter the password again.",
+            "savedPasswordAuthenticationFailed": "The saved password failed. Enter the password manually in the terminal.",
             "sftpRefreshFailedFormat": "Failed to refresh remote files: %@",
             "connectionTimedOutFormat": "Connection timed out after %@ seconds"
         ],

@@ -89,6 +89,8 @@ extension AppStrings {
             "sftpPasswordTitle": "SFTP パスワードを入力",
             "sftpPasswordMessage": "ターミナルは接続済みです。下のファイル管理を有効にするため、パスワードを一度入力してください。",
             "savePassword": "パスワードを保存",
+            "authenticationFailedRetryPassword": "認証に失敗しました。パスワードをもう一度入力してください。",
+            "savedPasswordAuthenticationFailed": "保存済みパスワードの認証に失敗しました。ターミナルで手動入力してください。",
             "sftpRefreshFailedFormat": "リモートファイルの更新に失敗しました: %@",
             "connectionTimedOutFormat": "接続が %@ 秒でタイムアウトしました"
         ],
@@ -179,6 +181,8 @@ extension AppStrings {
             "sftpPasswordTitle": "SFTP 비밀번호 입력",
             "sftpPasswordMessage": "터미널은 연결되어 있습니다. 아래 파일 관리를 사용하려면 비밀번호를 한 번 입력하세요.",
             "savePassword": "비밀번호 저장",
+            "authenticationFailedRetryPassword": "인증에 실패했습니다. 비밀번호를 다시 입력하세요.",
+            "savedPasswordAuthenticationFailed": "저장된 비밀번호 인증에 실패했습니다. 터미널에서 직접 입력하세요.",
             "sftpRefreshFailedFormat": "원격 파일 새로고침 실패: %@",
             "connectionTimedOutFormat": "%@초 후 연결 시간이 초과되었습니다"
         ],
@@ -267,6 +271,8 @@ extension AppStrings {
             "sftpPasswordTitle": "Introduce la contraseña SFTP",
             "sftpPasswordMessage": "La terminal ya está conectada. Introduce la contraseña una vez para activar la gestión de archivos.",
             "savePassword": "Guardar contraseña",
+            "authenticationFailedRetryPassword": "La autenticación falló. Introduce la contraseña de nuevo.",
+            "savedPasswordAuthenticationFailed": "La contraseña guardada falló. Escríbela manualmente en la terminal.",
             "sftpRefreshFailedFormat": "No se pudieron actualizar los archivos remotos: %@",
             "connectionTimedOutFormat": "La conexión agotó el tiempo tras %@ segundos"
         ],
@@ -357,6 +363,8 @@ extension AppStrings {
             "sftpPasswordTitle": "Saisir le mot de passe SFTP",
             "sftpPasswordMessage": "Le terminal est connecté. Saisissez le mot de passe une fois pour activer la gestion de fichiers.",
             "savePassword": "Enregistrer le mot de passe",
+            "authenticationFailedRetryPassword": "Échec de l’authentification. Saisissez de nouveau le mot de passe.",
+            "savedPasswordAuthenticationFailed": "Le mot de passe enregistré a échoué. Saisissez-le manuellement dans le terminal.",
             "sftpRefreshFailedFormat": "Échec de l’actualisation des fichiers distants : %@",
             "connectionTimedOutFormat": "Connexion expirée après %@ secondes"
         ],
@@ -447,6 +455,8 @@ extension AppStrings {
             "sftpPasswordTitle": "SFTP-Passwort eingeben",
             "sftpPasswordMessage": "Das Terminal ist verbunden. Geben Sie das Passwort einmal ein, um die Dateiverwaltung zu aktivieren.",
             "savePassword": "Passwort speichern",
+            "authenticationFailedRetryPassword": "Authentifizierung fehlgeschlagen. Geben Sie das Passwort erneut ein.",
+            "savedPasswordAuthenticationFailed": "Das gespeicherte Passwort ist fehlgeschlagen. Geben Sie es im Terminal manuell ein.",
             "sftpRefreshFailedFormat": "Remotedateien konnten nicht aktualisiert werden: %@",
             "connectionTimedOutFormat": "Verbindung nach %@ Sekunden abgelaufen"
         ],
@@ -537,6 +547,8 @@ extension AppStrings {
             "sftpPasswordTitle": "Введите пароль SFTP",
             "sftpPasswordMessage": "Терминал подключён. Введите пароль один раз, чтобы включить управление файлами.",
             "savePassword": "Сохранить пароль",
+            "authenticationFailedRetryPassword": "Ошибка аутентификации. Введите пароль ещё раз.",
+            "savedPasswordAuthenticationFailed": "Сохранённый пароль не подошёл. Введите пароль вручную в терминале.",
             "sftpRefreshFailedFormat": "Не удалось обновить удалённые файлы: %@",
             "connectionTimedOutFormat": "Время подключения истекло через %@ секунд"
         ],
@@ -627,6 +639,8 @@ extension AppStrings {
             "sftpPasswordTitle": "Digite a senha SFTP",
             "sftpPasswordMessage": "O terminal está conectado. Digite a senha uma vez para ativar o gerenciamento de arquivos.",
             "savePassword": "Salvar senha",
+            "authenticationFailedRetryPassword": "A autenticação falhou. Digite a senha novamente.",
+            "savedPasswordAuthenticationFailed": "A senha salva falhou. Digite-a manualmente no terminal.",
             "sftpRefreshFailedFormat": "Falha ao atualizar arquivos remotos: %@",
             "connectionTimedOutFormat": "A conexão expirou após %@ segundos"
         ]

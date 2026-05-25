@@ -217,6 +217,43 @@ import TermCCore
 }
 
 @MainActor
+@Test func connectSFTPForSelectedTabPromptsAgainAndDeletesSavedPasswordWhenAuthenticationFails() async {
+    let connection = ConnectionRecord(
+        alias: "Manual",
+        host: "manual.example.com",
+        username: "deploy",
+        authentication: .password,
+        defaultRemotePath: "/srv"
+    )
+    let tab = TerminalTab(
+        title: "Manual",
+        state: .connected,
+        transcript: "",
+        remotePath: "/srv",
+        session: LocalSSHOnlySession(record: connection)
+    )
+    let credentialStore = InMemoryCredentialStore()
+    try? await credentialStore.save(.password("stale"), for: connection.id)
+    let state = AppState(
+        tabs: [tab],
+        connections: [],
+        language: .zhHans,
+        sshClient: AuthenticationFailingSSHClient(),
+        credentialStore: credentialStore,
+        sftpService: RecordingSFTPService(filesByPath: [:])
+    )
+    state.selectedTabID = tab.id
+    state.remotePath = "/srv"
+
+    await state.connectSFTPForSelectedTab()
+
+    let savedCredential = try? await credentialStore.load(for: connection.id)
+    #expect(savedCredential == nil)
+    #expect(state.pendingSFTPCredentialPrompt?.tabID == tab.id)
+    #expect(state.notification?.message == "认证失败，请重新输入密码")
+}
+
+@MainActor
 @Test func submitSFTPCredentialCreatesFileManagementSessionForManualPasswordConnection() async {
     let connection = ConnectionRecord(
         alias: "Manual",
@@ -447,6 +484,37 @@ import TermCCore
     #expect(state.tabs.last?.state == .connected)
     #expect(state.tabs.last?.localProcess == .ssh(connection, credential: .password("secret")))
     #expect(state.remoteFiles.isEmpty)
+}
+
+@MainActor
+@Test func savedPasswordAuthenticationFailureFallsBackToInteractiveLocalSSH() async {
+    let connection = ConnectionRecord(
+        alias: "Saved Password",
+        host: "example.com",
+        username: "deploy",
+        authentication: .password,
+        defaultRemotePath: "/srv"
+    )
+    let credentialStore = InMemoryCredentialStore()
+    try? await credentialStore.save(.password("stale"), for: connection.id)
+    let state = AppState(
+        connections: [connection],
+        language: .zhHans,
+        sshClient: AuthenticationFailingSSHClient(),
+        credentialStore: credentialStore,
+        sftpService: RecordingSFTPService(filesByPath: [:])
+    )
+
+    await state.connect(connection)
+
+    #expect(state.tabs.last?.state == .connected)
+    if case .ssh(let fallbackConnection, let credential) = state.tabs.last?.localProcess {
+        #expect(fallbackConnection.id == connection.id)
+        #expect(credential == nil)
+    } else {
+        Issue.record("Expected interactive local SSH fallback")
+    }
+    #expect(state.notification?.message == "保存的密码认证失败，请在终端中手动输入密码")
 }
 
 @MainActor
@@ -1409,6 +1477,16 @@ private struct FailingSSHClient: SSHClientProviding {
     func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
         throw SSHConnectionTimeoutError(message: "连接失败")
     }
+}
+
+private struct AuthenticationFailingSSHClient: SSHClientProviding {
+    func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
+        throw TestAuthenticationFailure()
+    }
+}
+
+private struct TestAuthenticationFailure: Error, CustomStringConvertible {
+    var description: String { "allAuthenticationOptionsFailed" }
 }
 
 private actor RecordingSSHClient: SSHClientProviding {

@@ -176,6 +176,8 @@ struct AppStrings: Equatable, Sendable {
     var sftpPasswordTitle: String { self["sftpPasswordTitle"] }
     var sftpPasswordMessage: String { self["sftpPasswordMessage"] }
     var savePassword: String { self["savePassword"] }
+    var authenticationFailedRetryPassword: String { self["authenticationFailedRetryPassword"] }
+    var savedPasswordAuthenticationFailed: String { self["savedPasswordAuthenticationFailed"] }
     func sftpRefreshFailed(_ message: String) -> String {
         String(format: self["sftpRefreshFailedFormat"], message)
     }
