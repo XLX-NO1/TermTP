@@ -1816,3 +1816,18 @@ private func writeFakeDownload(to path: String, offset: Int64, totalBytes: Int64
     #expect(ConnectionSidebarActionStyle.borderOpacity == 0.12)
     #expect(ConnectionSidebarActionStyle.cornerRadius == 6)
 }
+
+@MainActor
+@Test func connectionSidebarKeepsActionsPinnedBelowScrollableSections() {
+    #expect(ConnectionSidebarLayout.sectionSpacing == 8)
+    #expect(ConnectionSidebarLayout.footerSpacing == 7)
+    #expect(ConnectionSidebarLayout.collapsibleHeaderHeight == 22)
+}
+
+@MainActor
+@Test func terminalTabStripUsesScrollableFixedHeightTabs() {
+    #expect(TerminalTabStripLayout.height == 34)
+    #expect(TerminalTabStripLayout.tabMinWidth == 74)
+    #expect(TerminalTabStripLayout.tabMaxWidth == 132)
+    #expect(TerminalTabStripLayout.closeButtonSize == 14)
+}

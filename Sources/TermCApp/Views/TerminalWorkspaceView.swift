@@ -91,51 +91,80 @@ struct TerminalWorkspaceView: View {
     }
 
     private var tabStrip: some View {
-        HStack(spacing: 5) {
-            ForEach(tabs) { tab in
-                Button {
-                    onSelectTab(tab.id)
-                } label: {
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(color(for: tab.state))
-                            .frame(width: 6, height: 6)
-
-                        Text(tab.title)
-                            .font(.caption)
-                            .lineLimit(1)
-                    }
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
-                    .foregroundStyle(tab.id == selectedTabID ? .white : .secondary)
-                    .background(
-                        tab.id == selectedTabID ? Color.white.opacity(0.14) : Color.clear,
-                        in: RoundedRectangle(cornerRadius: 6)
-                    )
+        ScrollView(.horizontal) {
+            HStack(spacing: 5) {
+                ForEach(tabs) { tab in
+                    tabButton(for: tab)
                 }
-                .buttonStyle(.plain)
-                .contextMenu {
-                    Button(strings.rename) {
-                        tabRenameTitle = tab.title
-                        tabRenameTarget = TabRenameTarget(id: tab.id, title: tab.title)
-                    }
 
-                    Button(strings.close) {
-                        onCloseTab(tab.id)
-                    }
-                    .disabled(tabs.count <= 1)
-                }
+                Spacer(minLength: 0)
             }
-
-            Spacer(minLength: 0)
+            .padding(.horizontal, 8)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
+        .scrollIndicators(.never)
+        .frame(height: TerminalTabStripLayout.height)
         .background(Color(red: 0.10, green: 0.11, blue: 0.12))
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Color.white.opacity(0.08))
                 .frame(height: 1)
+        }
+    }
+
+    private func tabButton(for tab: TerminalTab) -> some View {
+        Button {
+            onSelectTab(tab.id)
+        } label: {
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(color(for: tab.state))
+                    .frame(width: 6, height: 6)
+
+                Text(tab.title)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if tabs.count > 1 {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 8, weight: .bold))
+                        .frame(
+                            width: TerminalTabStripLayout.closeButtonSize,
+                            height: TerminalTabStripLayout.closeButtonSize
+                        )
+                        .foregroundStyle(.white.opacity(tab.id == selectedTabID ? 0.78 : 0.45))
+                }
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .frame(
+                minWidth: TerminalTabStripLayout.tabMinWidth,
+                maxWidth: TerminalTabStripLayout.tabMaxWidth,
+                alignment: .leading
+            )
+            .foregroundStyle(tab.id == selectedTabID ? .white : .secondary)
+            .background(
+                tab.id == selectedTabID ? Color.white.opacity(0.14) : Color.clear,
+                in: RoundedRectangle(cornerRadius: 6)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .simultaneousGesture(
+            TapGesture(count: 1).modifiers(.command).onEnded {
+                onCloseTab(tab.id)
+            }
+        )
+        .contextMenu {
+            Button(strings.rename) {
+                tabRenameTitle = tab.title
+                tabRenameTarget = TabRenameTarget(id: tab.id, title: tab.title)
+            }
+
+            Button(strings.close) {
+                onCloseTab(tab.id)
+            }
+            .disabled(tabs.count <= 1)
         }
     }
 
@@ -151,6 +180,13 @@ struct TerminalWorkspaceView: View {
             return .red
         }
     }
+}
+
+enum TerminalTabStripLayout {
+    static let height: CGFloat = 34
+    static let tabMinWidth: CGFloat = 74
+    static let tabMaxWidth: CGFloat = 132
+    static let closeButtonSize: CGFloat = 14
 }
 
 #Preview {

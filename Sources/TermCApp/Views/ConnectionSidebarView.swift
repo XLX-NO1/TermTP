@@ -5,6 +5,7 @@ import TermCCore
 struct ConnectionSidebarView: View {
     @Bindable var state: AppState
     @State private var searchText = ""
+    @State private var collapsedSections: Set<String> = []
 
     private var filteredConnections: [ConnectionRecord] {
         guard !searchText.isEmpty else {
@@ -63,58 +64,67 @@ struct ConnectionSidebarView: View {
                 .textFieldStyle(.roundedBorder)
                 .controlSize(.small)
 
-            if searchText.isEmpty {
-                connectionSection(state.t.recent, connections: state.recentConnections, kind: .recent)
-            }
+            ScrollView(.vertical) {
+                LazyVStack(alignment: .leading, spacing: ConnectionSidebarLayout.sectionSpacing) {
+                    if searchText.isEmpty {
+                        connectionSection(state.t.recent, connections: state.recentConnections, kind: .recent)
+                    }
 
-            connectionSection(state.t.favorites, connections: favorites, kind: .favorites)
+                    connectionSection(state.t.favorites, connections: favorites, kind: .favorites)
 
-            if searchText.isEmpty {
-                ForEach(state.connectionTags, id: \.self) { tag in
-                    connectionSection(
-                        "#\(tag)",
-                        connections: state.connections.filter { $0.tags.contains(tag) },
-                        kind: .normal
-                    )
+                    if searchText.isEmpty {
+                        ForEach(state.connectionTags, id: \.self) { tag in
+                            connectionSection(
+                                "#\(tag)",
+                                connections: state.connections.filter { $0.tags.contains(tag) },
+                                kind: .normal
+                            )
+                        }
+
+                        ForEach(state.connectionGroups, id: \.self) { group in
+                            connectionSection(
+                                group,
+                                connections: state.connections.filter { $0.group == group },
+                                kind: .normal
+                            )
+                        }
+                    }
+
+                    connectionSection(state.t.history, connections: history, kind: .history)
                 }
-
-                ForEach(state.connectionGroups, id: \.self) { group in
-                    connectionSection(
-                        group,
-                        connections: state.connections.filter { $0.group == group },
-                        kind: .normal
-                    )
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 2)
             }
-
-            connectionSection(state.t.history, connections: history, kind: .history)
+            .scrollIndicators(.visible)
 
             Spacer(minLength: 0)
 
-            HStack(spacing: 6) {
-                Button {
-                    importConnections()
-                } label: {
-                    Label(state.t.importConnections, systemImage: "square.and.arrow.down")
+            VStack(spacing: ConnectionSidebarLayout.footerSpacing) {
+                HStack(spacing: 6) {
+                    Button {
+                        importConnections()
+                    } label: {
+                        Label(state.t.importConnections, systemImage: "square.and.arrow.down")
+                    }
+                    .buttonStyle(ConnectionSidebarActionStyle())
+                    .controlSize(.small)
+
+                    Button {
+                        exportConnections()
+                    } label: {
+                        Label(state.t.exportConnections, systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(ConnectionSidebarActionStyle())
+                    .controlSize(.small)
                 }
-                .buttonStyle(ConnectionSidebarActionStyle())
-                .controlSize(.small)
 
                 Button {
-                    exportConnections()
+                    state.clearHistory()
                 } label: {
-                    Label(state.t.exportConnections, systemImage: "square.and.arrow.up")
+                    Text(state.t.clearHistory)
                 }
-                .buttonStyle(ConnectionSidebarActionStyle())
-                .controlSize(.small)
+                .buttonStyle(ConnectionSidebarActionStyle(alignment: .leading))
             }
-
-            Button {
-                state.clearHistory()
-            } label: {
-                Text(state.t.clearHistory)
-            }
-            .buttonStyle(ConnectionSidebarActionStyle(alignment: .leading))
         }
         .padding(10)
         .frame(maxHeight: .infinity, alignment: .top)
@@ -131,40 +141,80 @@ struct ConnectionSidebarView: View {
         connections: [ConnectionRecord],
         kind: ConnectionSectionKind
     ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.white)
-                .textCase(.uppercase)
+        let sectionID = "\(kind)-\(title)"
+        let isCollapsed = collapsedSections.contains(sectionID)
 
-            if connections.isEmpty {
-                Text(state.t.noConnections)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.66))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 5)
+        return VStack(alignment: .leading, spacing: 6) {
+            Button {
+                toggleSection(sectionID)
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .frame(width: 10)
+
+                    Text(title)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .textCase(.uppercase)
+
+                    Spacer(minLength: 0)
+
+                    Text("\(connections.count)")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.48))
+                }
+                .frame(height: ConnectionSidebarLayout.collapsibleHeaderHeight)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isCollapsed {
+                EmptyView()
+            } else if connections.isEmpty {
+                emptySection
             } else {
-                ForEach(connections) { connection in
-                    Button {
-                        Task {
-                            await state.connect(connection)
-                        }
-                    } label: {
-                        ConnectionRow(connection: connection)
-                    }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        Button(connection.isFavorite ? state.t.removeFromFavorites : state.t.addToFavorites) {
-                            state.toggleFavorite(connection.id)
-                        }
+                connectionRows(connections, kind: kind)
+            }
+        }
+    }
 
-                        Button(state.t.delete, role: .destructive) {
-                            deleteConnection(connection.id, from: kind)
-                        }
-                    }
+    private var emptySection: some View {
+        Text(state.t.noConnections)
+            .font(.caption)
+            .foregroundStyle(.white.opacity(0.66))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 5)
+    }
+
+    private func connectionRows(_ connections: [ConnectionRecord], kind: ConnectionSectionKind) -> some View {
+        ForEach(connections) { connection in
+            Button {
+                Task {
+                    await state.connect(connection)
+                }
+            } label: {
+                ConnectionRow(connection: connection)
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                Button(connection.isFavorite ? state.t.removeFromFavorites : state.t.addToFavorites) {
+                    state.toggleFavorite(connection.id)
+                }
+
+                Button(state.t.delete, role: .destructive) {
+                    deleteConnection(connection.id, from: kind)
                 }
             }
+        }
+    }
+
+    private func toggleSection(_ id: String) {
+        if collapsedSections.contains(id) {
+            collapsedSections.remove(id)
+        } else {
+            collapsedSections.insert(id)
         }
     }
 
@@ -218,6 +268,12 @@ struct ConnectionSidebarView: View {
             state.showNotification(kind: .error, message: state.t.exportConnectionsFailed(String(describing: error)))
         }
     }
+}
+
+enum ConnectionSidebarLayout {
+    static let sectionSpacing: CGFloat = 8
+    static let footerSpacing: CGFloat = 7
+    static let collapsibleHeaderHeight: CGFloat = 22
 }
 
 struct ConnectionSidebarActionStyle: ButtonStyle {
