@@ -66,6 +66,10 @@ final class MenuBarController: NSObject {
             return normalizedMenuBarTemplateImage(image)
         }
 
+        return makeFallbackMenuBarTemplateImage()
+    }
+
+    static func makeFallbackMenuBarTemplateImage() -> NSImage {
         let image = NSImage(size: menuBarIconSize)
         image.lockFocus()
         defer {
@@ -74,27 +78,15 @@ final class MenuBarController: NSObject {
 
         NSColor.black.setStroke()
         let path = NSBezierPath()
-        path.lineWidth = 1.8
+        path.lineWidth = 2.2
         path.lineCapStyle = .round
         path.lineJoinStyle = .round
 
-        let topTriangle = [
-            NSPoint(x: 9, y: 15),
-            NSPoint(x: 3.8, y: 6),
-            NSPoint(x: 14.2, y: 6)
-        ]
-        let bottomTriangle = [
-            NSPoint(x: 9, y: 3),
-            NSPoint(x: 3.8, y: 12),
-            NSPoint(x: 14.2, y: 12)
-        ]
-
-        for triangle in [topTriangle, bottomTriangle] {
-            path.move(to: triangle[0])
-            path.line(to: triangle[1])
-            path.line(to: triangle[2])
-            path.close()
-        }
+        path.move(to: NSPoint(x: 3.5, y: 12.5))
+        path.line(to: NSPoint(x: 7.8, y: 9))
+        path.line(to: NSPoint(x: 3.5, y: 5.5))
+        path.move(to: NSPoint(x: 10, y: 5.5))
+        path.line(to: NSPoint(x: 14.5, y: 5.5))
 
         path.stroke()
         return normalizedMenuBarTemplateImage(image)

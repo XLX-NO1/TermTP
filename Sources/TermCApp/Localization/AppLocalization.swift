@@ -75,6 +75,9 @@ struct AppStrings: Equatable, Sendable {
     func exportConnectionsFailed(_ message: String) -> String {
         String(format: self["exportConnectionsFailedFormat"], message)
     }
+    func loadConnectionsFailed(_ message: String) -> String {
+        String(format: self["loadConnectionsFailedFormat"], message)
+    }
     var noConnections: String { self["noConnections"] }
     var addToFavorites: String { self["addToFavorites"] }
     var removeFromFavorites: String { self["removeFromFavorites"] }
@@ -172,6 +175,7 @@ struct AppStrings: Equatable, Sendable {
     var sftpUnsupportedForConnection: String { self["sftpUnsupportedForConnection"] }
     var sftpPasswordTitle: String { self["sftpPasswordTitle"] }
     var sftpPasswordMessage: String { self["sftpPasswordMessage"] }
+    var savePassword: String { self["savePassword"] }
     func sftpRefreshFailed(_ message: String) -> String {
         String(format: self["sftpRefreshFailedFormat"], message)
     }

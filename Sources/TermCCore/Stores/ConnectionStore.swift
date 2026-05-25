@@ -64,6 +64,21 @@ public actor ConnectionStore {
         try writeState(state)
     }
 
+    public func backupCorruptStore() throws -> URL? {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            return nil
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let timestamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let backupURL = fileURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("\(fileURL.lastPathComponent).corrupt-\(timestamp)")
+        try FileManager.default.copyItem(at: fileURL, to: backupURL)
+        return backupURL
+    }
+
     private func readState() throws -> DiskState {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             return DiskState(connections: [], history: [])

@@ -4,6 +4,35 @@ import TermCCore
 @testable import TermCApp
 
 @MainActor
+@Test func defaultCredentialStoreUsesKeychain() {
+    let state = AppState(connections: [])
+
+    #expect(state.credentialStore is KeychainCredentialStore)
+}
+
+@MainActor
+@Test func migrateLegacyFileCredentialsCopiesSecretsAndRemovesPlaintextStore() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let url = directory.appendingPathComponent("credentials.json")
+    let legacyStore = FileCredentialStore(fileURL: url)
+    let credentialStore = InMemoryCredentialStore()
+    let id = UUID(uuidString: "55555555-5555-5555-5555-555555555555")!
+    try await legacyStore.save(.password("secret"), for: id)
+    let state = AppState(
+        connections: [],
+        credentialStore: credentialStore,
+        legacyCredentialStore: legacyStore
+    )
+
+    await state.migrateLegacyFileCredentialsIfNeeded()
+
+    let migratedCredential = try await credentialStore.load(for: id)
+    #expect(migratedCredential == .password("secret"))
+    #expect(!FileManager.default.fileExists(atPath: url.path))
+}
+
+@MainActor
 @Test func terminalFontSizeOptionsCoverEveryIntegerSize() {
     let state = AppState(connections: [])
 
@@ -226,11 +255,57 @@ import TermCCore
 }
 
 @MainActor
+@Test func submitSFTPCredentialCanAvoidSavingManualPassword() async {
+    let connection = ConnectionRecord(
+        alias: "Manual",
+        host: "manual.example.com",
+        username: "deploy",
+        authentication: .password,
+        defaultRemotePath: "/srv"
+    )
+    let tab = TerminalTab(
+        title: "Manual",
+        state: .connected,
+        transcript: "",
+        remotePath: "/srv",
+        session: LocalSSHOnlySession(record: connection)
+    )
+    let credentialStore = InMemoryCredentialStore()
+    let state = AppState(
+        tabs: [tab],
+        connections: [],
+        sshClient: RecordingSSHClient(),
+        credentialStore: credentialStore,
+        sftpService: RecordingSFTPService(filesByPath: ["/srv": []])
+    )
+    state.selectedTabID = tab.id
+    state.remotePath = "/srv"
+    await state.connectSFTPForSelectedTab()
+
+    await state.submitSFTPCredential(password: "secret", saveCredential: false)
+
+    let savedCredential = try? await credentialStore.load(for: connection.id)
+    #expect(savedCredential == nil)
+    #expect(state.pendingSFTPCredentialPrompt == nil)
+}
+
+@MainActor
 @Test func menuBarTemplateImageFallsBackWhenResourceIsMissing() {
     let image = MenuBarController.makeMenuBarTemplateImage()
 
     #expect(image.size == .init(width: 18, height: 18))
     #expect(image.isTemplate)
+}
+
+@MainActor
+@Test func menuBarFallbackImageUsesTerminalPromptMark() {
+    let image = MenuBarController.makeFallbackMenuBarTemplateImage()
+
+    #expect(image.size == .init(width: 18, height: 18))
+    #expect(image.isTemplate)
+    #expect(menuBarImageHasInk(image, in: NSRect(x: 3, y: 5, width: 7, height: 8)))
+    #expect(menuBarImageHasInk(image, in: NSRect(x: 9, y: 5, width: 6, height: 2)))
+    #expect(!menuBarImageHasInk(image, in: NSRect(x: 7, y: 14, width: 4, height: 3)))
 }
 
 @MainActor
@@ -668,6 +743,27 @@ import TermCCore
 
     #expect(secondLaunch.connections == [favorite])
     #expect(secondLaunch.favoriteConnections == [favorite])
+}
+
+@MainActor
+@Test func loadConnectionsPreservesCurrentConnectionsWhenStoredFileIsCorrupt() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension("json")
+    try Data("{ broken json".utf8).write(to: url)
+    let existing = ConnectionRecord.samplePassword
+    let state = AppState(
+        connections: [existing],
+        language: .zhHans,
+        connectionStore: ConnectionStore(fileURL: url)
+    )
+
+    await state.loadConnections()
+
+    #expect(state.connections == [existing])
+    #expect(FileManager.default.fileExists(atPath: url.path))
+    #expect(state.notification?.kind == .error)
+    #expect(state.notification?.message.contains("读取连接记录失败") == true)
 }
 
 @MainActor
@@ -1497,6 +1593,33 @@ private actor SlowMutationSFTPService: SFTPServicing {
     func previewText(remotePath: String, byteLimit: Int, session: SSHSessionProviding) async throws -> String { "" }
 
     func changePermissions(remotePath: String, permissions: UInt32, session: SSHSessionProviding) async throws {}
+}
+
+@MainActor
+private func menuBarImageHasInk(_ image: NSImage, in rect: NSRect) -> Bool {
+    guard
+        let data = image.tiffRepresentation,
+        let bitmap = NSBitmapImageRep(data: data)
+    else {
+        return false
+    }
+
+    let scaleX = CGFloat(bitmap.pixelsWide) / image.size.width
+    let scaleY = CGFloat(bitmap.pixelsHigh) / image.size.height
+    let minX = max(0, Int(rect.minX * scaleX))
+    let maxX = min(bitmap.pixelsWide - 1, Int(rect.maxX * scaleX))
+    let minY = max(0, bitmap.pixelsHigh - Int(rect.maxY * scaleY))
+    let maxY = min(bitmap.pixelsHigh - 1, bitmap.pixelsHigh - Int(rect.minY * scaleY))
+
+    for y in minY...maxY {
+        for x in minX...maxX {
+            if (bitmap.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.2 {
+                return true
+            }
+        }
+    }
+
+    return false
 }
 
 private actor ProgressRecordingSFTPService: SFTPServicing {

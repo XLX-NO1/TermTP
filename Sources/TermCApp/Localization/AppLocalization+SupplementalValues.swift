@@ -14,6 +14,7 @@ extension AppStrings {
             "exportConnections": "エクスポート",
             "importConnectionsFailedFormat": "接続のインポートに失敗しました: %@",
             "exportConnectionsFailedFormat": "接続のエクスポートに失敗しました: %@",
+            "loadConnectionsFailedFormat": "接続の読み込みに失敗しました。現在の一覧は保持されました: %@",
             "noConnections": "接続なし",
             "addToFavorites": "お気に入りに追加",
             "removeFromFavorites": "お気に入りから削除",
@@ -87,6 +88,7 @@ extension AppStrings {
             "sftpUnsupportedForConnection": "この接続では SFTP ファイル管理を使用できません",
             "sftpPasswordTitle": "SFTP パスワードを入力",
             "sftpPasswordMessage": "ターミナルは接続済みです。下のファイル管理を有効にするため、パスワードを一度入力してください。",
+            "savePassword": "パスワードを保存",
             "sftpRefreshFailedFormat": "リモートファイルの更新に失敗しました: %@",
             "connectionTimedOutFormat": "接続が %@ 秒でタイムアウトしました"
         ],
@@ -102,6 +104,7 @@ extension AppStrings {
             "exportConnections": "내보내기",
             "importConnectionsFailedFormat": "연결 가져오기 실패: %@",
             "exportConnectionsFailedFormat": "연결 내보내기 실패: %@",
+            "loadConnectionsFailedFormat": "연결을 불러오지 못했습니다. 현재 목록은 유지되었습니다: %@",
             "noConnections": "연결 없음",
             "addToFavorites": "즐겨찾기에 추가",
             "removeFromFavorites": "즐겨찾기에서 제거",
@@ -175,6 +178,7 @@ extension AppStrings {
             "sftpUnsupportedForConnection": "이 연결은 SFTP 파일 관리를 지원하지 않습니다",
             "sftpPasswordTitle": "SFTP 비밀번호 입력",
             "sftpPasswordMessage": "터미널은 연결되어 있습니다. 아래 파일 관리를 사용하려면 비밀번호를 한 번 입력하세요.",
+            "savePassword": "비밀번호 저장",
             "sftpRefreshFailedFormat": "원격 파일 새로고침 실패: %@",
             "connectionTimedOutFormat": "%@초 후 연결 시간이 초과되었습니다"
         ],
@@ -190,6 +194,7 @@ extension AppStrings {
             "exportConnections": "Exportar",
             "importConnectionsFailedFormat": "No se pudieron importar las conexiones: %@",
             "exportConnectionsFailedFormat": "No se pudieron exportar las conexiones: %@",
+            "loadConnectionsFailedFormat": "No se pudieron cargar las conexiones. Se conservó la lista actual: %@",
             "noConnections": "Sin conexiones",
             "addToFavorites": "Añadir a favoritos",
             "removeFromFavorites": "Quitar de favoritos",
@@ -261,6 +266,7 @@ extension AppStrings {
             "sftpUnsupportedForConnection": "Esta conexión no admite gestión de archivos SFTP",
             "sftpPasswordTitle": "Introduce la contraseña SFTP",
             "sftpPasswordMessage": "La terminal ya está conectada. Introduce la contraseña una vez para activar la gestión de archivos.",
+            "savePassword": "Guardar contraseña",
             "sftpRefreshFailedFormat": "No se pudieron actualizar los archivos remotos: %@",
             "connectionTimedOutFormat": "La conexión agotó el tiempo tras %@ segundos"
         ],
@@ -276,6 +282,7 @@ extension AppStrings {
             "exportConnections": "Exporter",
             "importConnectionsFailedFormat": "Échec de l’import des connexions : %@",
             "exportConnectionsFailedFormat": "Échec de l’export des connexions : %@",
+            "loadConnectionsFailedFormat": "Échec du chargement des connexions. La liste actuelle a été conservée : %@",
             "noConnections": "Aucune connexion",
             "addToFavorites": "Ajouter aux favoris",
             "removeFromFavorites": "Retirer des favoris",
@@ -349,6 +356,7 @@ extension AppStrings {
             "sftpUnsupportedForConnection": "Cette connexion ne prend pas en charge la gestion de fichiers SFTP",
             "sftpPasswordTitle": "Saisir le mot de passe SFTP",
             "sftpPasswordMessage": "Le terminal est connecté. Saisissez le mot de passe une fois pour activer la gestion de fichiers.",
+            "savePassword": "Enregistrer le mot de passe",
             "sftpRefreshFailedFormat": "Échec de l’actualisation des fichiers distants : %@",
             "connectionTimedOutFormat": "Connexion expirée après %@ secondes"
         ],
@@ -364,6 +372,7 @@ extension AppStrings {
             "exportConnections": "Exportieren",
             "importConnectionsFailedFormat": "Verbindungen konnten nicht importiert werden: %@",
             "exportConnectionsFailedFormat": "Verbindungen konnten nicht exportiert werden: %@",
+            "loadConnectionsFailedFormat": "Verbindungen konnten nicht geladen werden. Die aktuelle Liste wurde behalten: %@",
             "noConnections": "Keine Verbindungen",
             "addToFavorites": "Zu Favoriten hinzufügen",
             "removeFromFavorites": "Aus Favoriten entfernen",
@@ -437,6 +446,7 @@ extension AppStrings {
             "sftpUnsupportedForConnection": "Diese Verbindung unterstützt keine SFTP-Dateiverwaltung",
             "sftpPasswordTitle": "SFTP-Passwort eingeben",
             "sftpPasswordMessage": "Das Terminal ist verbunden. Geben Sie das Passwort einmal ein, um die Dateiverwaltung zu aktivieren.",
+            "savePassword": "Passwort speichern",
             "sftpRefreshFailedFormat": "Remotedateien konnten nicht aktualisiert werden: %@",
             "connectionTimedOutFormat": "Verbindung nach %@ Sekunden abgelaufen"
         ],
@@ -452,6 +462,7 @@ extension AppStrings {
             "exportConnections": "Экспорт",
             "importConnectionsFailedFormat": "Не удалось импортировать подключения: %@",
             "exportConnectionsFailedFormat": "Не удалось экспортировать подключения: %@",
+            "loadConnectionsFailedFormat": "Не удалось загрузить подключения. Текущий список сохранён: %@",
             "noConnections": "Нет подключений",
             "addToFavorites": "Добавить в избранное",
             "removeFromFavorites": "Удалить из избранного",
@@ -525,6 +536,7 @@ extension AppStrings {
             "sftpUnsupportedForConnection": "Это подключение не поддерживает управление файлами SFTP",
             "sftpPasswordTitle": "Введите пароль SFTP",
             "sftpPasswordMessage": "Терминал подключён. Введите пароль один раз, чтобы включить управление файлами.",
+            "savePassword": "Сохранить пароль",
             "sftpRefreshFailedFormat": "Не удалось обновить удалённые файлы: %@",
             "connectionTimedOutFormat": "Время подключения истекло через %@ секунд"
         ],
@@ -540,6 +552,7 @@ extension AppStrings {
             "exportConnections": "Exportar",
             "importConnectionsFailedFormat": "Falha ao importar conexões: %@",
             "exportConnectionsFailedFormat": "Falha ao exportar conexões: %@",
+            "loadConnectionsFailedFormat": "Falha ao carregar conexões. A lista atual foi mantida: %@",
             "noConnections": "Sem conexões",
             "addToFavorites": "Adicionar aos favoritos",
             "removeFromFavorites": "Remover dos favoritos",
@@ -613,6 +626,7 @@ extension AppStrings {
             "sftpUnsupportedForConnection": "Esta conexão não oferece suporte ao gerenciamento de arquivos SFTP",
             "sftpPasswordTitle": "Digite a senha SFTP",
             "sftpPasswordMessage": "O terminal está conectado. Digite a senha uma vez para ativar o gerenciamento de arquivos.",
+            "savePassword": "Salvar senha",
             "sftpRefreshFailedFormat": "Falha ao atualizar arquivos remotos: %@",
             "connectionTimedOutFormat": "A conexão expirou após %@ segundos"
         ]

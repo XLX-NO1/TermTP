@@ -192,7 +192,29 @@ extension AppState {
             let snapshot = try await connectionStore.load()
             connections = snapshot.connections
         } catch {
-            connections = []
+            _ = try? await connectionStore.backupCorruptStore()
+            showNotification(kind: .error, message: t.loadConnectionsFailed(String(describing: error)))
+        }
+    }
+
+    func migrateLegacyFileCredentialsIfNeeded() async {
+        guard !(credentialStore is FileCredentialStore) else {
+            return
+        }
+
+        do {
+            let credentials = try await legacyCredentialStore.loadAll()
+            guard !credentials.isEmpty else {
+                return
+            }
+
+            for (connectionID, credential) in credentials {
+                try await credentialStore.save(credential, for: connectionID)
+            }
+
+            try await legacyCredentialStore.removeStoreFile()
+        } catch {
+            // Keep the legacy file in place if migration fails so credentials are not lost.
         }
     }
 

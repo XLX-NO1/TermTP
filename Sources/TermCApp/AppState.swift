@@ -28,6 +28,7 @@ final class AppState {
 
     let sshClient: any SSHClientProviding
     let credentialStore: any CredentialStoring
+    let legacyCredentialStore: FileCredentialStore
     let sftpService: any SFTPServicing
     let connectionStore: ConnectionStore
     let connectionTimeoutSeconds: Double
@@ -107,7 +108,8 @@ final class AppState {
         terminalTheme: TerminalTheme? = nil,
         defaults: UserDefaults = .standard,
         sshClient: (any SSHClientProviding)? = nil,
-        credentialStore: any CredentialStoring = FileCredentialStore(fileURL: AppState.defaultCredentialStoreURL),
+        credentialStore: any CredentialStoring = KeychainCredentialStore(),
+        legacyCredentialStore: FileCredentialStore = FileCredentialStore(fileURL: AppState.defaultCredentialStoreURL),
         sftpService: any SFTPServicing = CitadelSFTPService(),
         connectionStore: ConnectionStore = ConnectionStore(fileURL: AppState.defaultConnectionStoreURL),
         connectionTimeoutSeconds: Double = 10
@@ -119,6 +121,7 @@ final class AppState {
             hostKeyTrustStore: hostKeyTrustStore
         )
         self.credentialStore = credentialStore
+        self.legacyCredentialStore = legacyCredentialStore
         self.sftpService = sftpService
         self.connectionStore = connectionStore
         self.connectionTimeoutSeconds = connectionTimeoutSeconds

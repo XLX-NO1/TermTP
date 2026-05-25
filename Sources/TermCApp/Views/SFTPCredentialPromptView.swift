@@ -5,6 +5,7 @@ struct SFTPCredentialPromptView: View {
     @Bindable var state: AppState
     let prompt: SFTPCredentialPrompt
     @State private var password = ""
+    @State private var shouldSavePassword = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -23,6 +24,10 @@ struct SFTPCredentialPromptView: View {
             SecureField(state.t.password, text: $password)
                 .textFieldStyle(.roundedBorder)
 
+            Toggle(state.t.savePassword, isOn: $shouldSavePassword)
+                .toggleStyle(.checkbox)
+                .font(.caption)
+
             HStack {
                 Spacer()
 
@@ -32,7 +37,7 @@ struct SFTPCredentialPromptView: View {
 
                 Button(state.t.ok) {
                     Task {
-                        await state.submitSFTPCredential(password: password)
+                        await state.submitSFTPCredential(password: password, saveCredential: shouldSavePassword)
                     }
                 }
                 .keyboardShortcut(.defaultAction)

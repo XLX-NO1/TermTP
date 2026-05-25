@@ -53,6 +53,24 @@ public actor FileCredentialStore: CredentialStoring {
         try writeState(state)
     }
 
+    public func loadAll() throws -> [UUID: Credential] {
+        try readState().credentials.reduce(into: [:]) { result, entry in
+            guard let id = UUID(uuidString: entry.key) else {
+                return
+            }
+
+            result[id] = entry.value.credential
+        }
+    }
+
+    public func removeStoreFile() throws {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            return
+        }
+
+        try FileManager.default.removeItem(at: fileURL)
+    }
+
     private func readState() throws -> FileCredentialState {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             return FileCredentialState(credentials: [:])

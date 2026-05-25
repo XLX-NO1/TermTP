@@ -86,7 +86,7 @@ extension AppState {
         )
     }
 
-    func submitSFTPCredential(password: String) async {
+    func submitSFTPCredential(password: String, saveCredential: Bool = true) async {
         guard let prompt = pendingSFTPCredentialPrompt else {
             return
         }
@@ -99,7 +99,9 @@ extension AppState {
         do {
             let credential = Credential.password(trimmedPassword)
             let session = try await connectWithTimeout(record: prompt.connection, credential: credential)
-            try? await credentialStore.save(credential, for: prompt.connection.id)
+            if saveCredential {
+                try? await credentialStore.save(credential, for: prompt.connection.id)
+            }
             attachSession(session, to: prompt.tabID)
             pendingSFTPCredentialPrompt = nil
             await refreshRemoteFiles(tabID: prompt.tabID, path: prompt.path, session: session)

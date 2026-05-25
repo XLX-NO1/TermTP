@@ -28,6 +28,7 @@ extension AppStrings {
             "exportConnections": "导出",
             "importConnectionsFailedFormat": "导入连接失败：%@",
             "exportConnectionsFailedFormat": "导出连接失败：%@",
+            "loadConnectionsFailedFormat": "读取连接记录失败，已保留当前列表：%@",
             "noConnections": "暂无连接",
             "addToFavorites": "加入收藏",
             "removeFromFavorites": "取消收藏",
@@ -117,6 +118,7 @@ extension AppStrings {
             "sftpUnsupportedForConnection": "当前连接暂不支持 SFTP 文件管理",
             "sftpPasswordTitle": "输入 SFTP 密码",
             "sftpPasswordMessage": "终端已连接。请输入一次密码，用于打开下方文件管理。",
+            "savePassword": "保存密码",
             "sftpRefreshFailedFormat": "刷新远程文件失败：%@",
             "connectionTimedOutFormat": "连接超时，已等待 %@ 秒"
         ],
@@ -146,6 +148,7 @@ extension AppStrings {
             "exportConnections": "Export",
             "importConnectionsFailedFormat": "Failed to import connections: %@",
             "exportConnectionsFailedFormat": "Failed to export connections: %@",
+            "loadConnectionsFailedFormat": "Failed to load connections. Current list was kept: %@",
             "noConnections": "No connections",
             "addToFavorites": "Add to Favorites",
             "removeFromFavorites": "Remove from Favorites",
@@ -235,6 +238,7 @@ extension AppStrings {
             "sftpUnsupportedForConnection": "SFTP file management is not supported for this connection",
             "sftpPasswordTitle": "Enter SFTP Password",
             "sftpPasswordMessage": "The terminal is connected. Enter the password once to enable file management below.",
+            "savePassword": "Save password",
             "sftpRefreshFailedFormat": "Failed to refresh remote files: %@",
             "connectionTimedOutFormat": "Connection timed out after %@ seconds"
         ],

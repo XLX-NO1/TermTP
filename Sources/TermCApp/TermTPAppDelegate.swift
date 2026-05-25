@@ -15,6 +15,7 @@ final class TermTPAppDelegate: NSObject, NSApplicationDelegate {
         windowController.showWindow()
 
         Task {
+            await state.migrateLegacyFileCredentialsIfNeeded()
             await state.loadConnections()
         }
     }
