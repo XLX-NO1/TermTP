@@ -292,6 +292,57 @@ import TermCCore
 }
 
 @MainActor
+@Test func submitSFTPCredentialWaitsForHostKeyTrustBeforeConnectionTimeout() async {
+    let connection = ConnectionRecord(
+        alias: "Manual",
+        host: "manual.example.com",
+        username: "deploy",
+        authentication: .password,
+        defaultRemotePath: "/srv"
+    )
+    let tab = TerminalTab(
+        title: "Manual",
+        state: .connected,
+        transcript: "",
+        remotePath: "/srv",
+        session: LocalSSHOnlySession(record: connection)
+    )
+    let sshClient = HostKeyPromptingSSHClient()
+    let sftpService = RecordingSFTPService(filesByPath: [
+        "/srv": [RemoteFile(name: "app.log", path: "/srv/app.log", kind: .file, size: 5)]
+    ])
+    let state = AppState(
+        tabs: [tab],
+        connections: [],
+        sshClient: sshClient,
+        sftpService: sftpService,
+        connectionTimeoutSeconds: 0.01
+    )
+    state.selectedTabID = tab.id
+    state.remotePath = "/srv"
+    await state.connectSFTPForSelectedTab()
+
+    let submitTask = Task {
+        await state.submitSFTPCredential(password: "secret")
+    }
+    await sshClient.waitUntilPrompting()
+    state.pendingHostKeyPrompt = HostKeyPrompt(
+        host: connection.host,
+        port: connection.port,
+        key: "ssh-ed25519 AAAATEST",
+        fingerprint: "SHA256:test"
+    )
+    try? await Task.sleep(for: .milliseconds(35))
+    state.pendingHostKeyPrompt = nil
+    await sshClient.finish()
+    await submitTask.value
+
+    #expect(state.pendingSFTPCredentialPrompt == nil)
+    #expect(state.notification == nil)
+    #expect(state.remoteFiles == [RemoteFile(name: "app.log", path: "/srv/app.log", kind: .file, size: 5)])
+}
+
+@MainActor
 @Test func submitSFTPCredentialCanAvoidSavingManualPassword() async {
     let connection = ConnectionRecord(
         alias: "Manual",
@@ -1485,6 +1536,37 @@ private struct AuthenticationFailingSSHClient: SSHClientProviding {
     }
 }
 
+private actor HostKeyPromptingSSHClient: SSHClientProviding {
+    private var promptStarted: CheckedContinuation<Void, Never>?
+    private var connectCanFinish: CheckedContinuation<Void, Never>?
+    private var isPrompting = false
+
+    func waitUntilPrompting() async {
+        if isPrompting {
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            promptStarted = continuation
+        }
+    }
+
+    func finish() {
+        connectCanFinish?.resume()
+        connectCanFinish = nil
+    }
+
+    func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
+        isPrompting = true
+        promptStarted?.resume()
+        promptStarted = nil
+        await withCheckedContinuation { continuation in
+            connectCanFinish = continuation
+        }
+        return FakeSSHSession(record: record)
+    }
+}
+
 private struct TestAuthenticationFailure: Error, CustomStringConvertible {
     var description: String { "allAuthenticationOptionsFailed" }
 }
@@ -1829,5 +1911,5 @@ private func writeFakeDownload(to path: String, offset: Int64, totalBytes: Int64
     #expect(TerminalTabStripLayout.height == 34)
     #expect(TerminalTabStripLayout.tabMinWidth == 74)
     #expect(TerminalTabStripLayout.tabMaxWidth == 132)
-    #expect(TerminalTabStripLayout.closeButtonSize == 14)
+    #expect(TerminalTabStripLayout.closeButtonSize == 18)
 }

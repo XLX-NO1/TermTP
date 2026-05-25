@@ -64,7 +64,11 @@ extension AppState {
                 return
             }
 
-            let sftpSession = try await connectWithTimeout(record: connection, credential: credential)
+            let sftpSession = try await connectWithTimeout(
+                record: connection,
+                credential: credential,
+                suspendsWhileHostKeyPromptIsVisible: true
+            )
             attachSession(sftpSession, to: selectedTabID)
             pendingSFTPCredentialPrompt = nil
             await refreshRemoteFiles(tabID: selectedTabID, path: remotePath, session: sftpSession)
@@ -105,7 +109,11 @@ extension AppState {
 
         do {
             let credential = Credential.password(trimmedPassword)
-            let session = try await connectWithTimeout(record: prompt.connection, credential: credential)
+            let session = try await connectWithTimeout(
+                record: prompt.connection,
+                credential: credential,
+                suspendsWhileHostKeyPromptIsVisible: true
+            )
             if saveCredential {
                 try? await credentialStore.save(credential, for: prompt.connection.id)
             }

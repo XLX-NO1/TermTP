@@ -303,7 +303,8 @@ extension AppState {
 
     func connectWithTimeout(
         record: ConnectionRecord,
-        credential: Credential?
+        credential: Credential?,
+        suspendsWhileHostKeyPromptIsVisible: Bool = false
     ) async throws -> SSHSessionProviding {
         let timeoutMessage = t.connectionTimedOut(seconds: connectionTimeoutSeconds)
         return try await withThrowingTaskGroup(of: SSHSessionProviding.self) { group in
@@ -311,7 +312,24 @@ extension AppState {
                 try await self.sshClient.connect(record: record, credential: credential)
             }
             group.addTask {
-                try await Task.sleep(for: .seconds(self.connectionTimeoutSeconds))
+                let deadline = Date().addingTimeInterval(self.connectionTimeoutSeconds)
+                while true {
+                    if Task.isCancelled {
+                        throw CancellationError()
+                    }
+
+                    if suspendsWhileHostKeyPromptIsVisible, await self.pendingHostKeyPrompt != nil {
+                        try await Task.sleep(for: .milliseconds(50))
+                        continue
+                    }
+
+                    let remaining = deadline.timeIntervalSinceNow
+                    guard remaining > 0 else {
+                        break
+                    }
+
+                    try await Task.sleep(for: .seconds(min(remaining, 0.05)))
+                }
                 throw SSHConnectionTimeoutError(message: timeoutMessage)
             }
 
