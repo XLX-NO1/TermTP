@@ -60,6 +60,7 @@ struct AppStrings: Equatable, Sendable {
     var newConnection: String { self["newConnection"] }
     var cancel: String { self["cancel"] }
     var ok: String { self["ok"] }
+    var save: String { self["save"] }
     var connect: String { self["connect"] }
     var connections: String { self["connections"] }
     var search: String { self["search"] }

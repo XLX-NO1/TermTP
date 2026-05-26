@@ -101,6 +101,11 @@ struct ConnectionFormView: View {
                 }
                 .keyboardShortcut(.cancelAction)
 
+                Button(state.t.save) {
+                    state.saveDraftConnection()
+                }
+                .disabled(!canSave)
+
                 Button(state.t.connect) {
                     Task {
                         await state.connectDraftConnection()

@@ -162,9 +162,7 @@ extension AppState {
             return
         }
 
-        connections.append(connection)
         isConnectionFormPresented = false
-        await persistConnections()
 
         let password = draftPassword.trimmingCharacters(in: .whitespacesAndNewlines)
         let privateKeyPassphrase = draftPrivateKeyPassphrase.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -175,11 +173,7 @@ extension AppState {
             privateKeyPassphrase.isEmpty ? nil : .privateKeyPassphrase(privateKeyPassphrase)
         }
 
-        if let credential {
-            try? await credentialStore.save(credential, for: connection.id)
-        }
-
-        await connect(connection, credential: credential)
+        await connect(connection, credential: credential, persistsNewConnection: true)
     }
 
     func connect(_ connection: ConnectionRecord) async {
@@ -226,8 +220,12 @@ extension AppState {
         }
     }
 
-    func connect(_ connection: ConnectionRecord, credential: Credential?) async {
-        let connection = markConnectionUsed(connection)
+    func connect(
+        _ connection: ConnectionRecord,
+        credential: Credential?,
+        persistsNewConnection: Bool = false
+    ) async {
+        var connection = connection
         let tab = TerminalTab(
             title: connection.alias,
             state: .connecting,
@@ -238,6 +236,14 @@ extension AppState {
         setRemotePath(connection.defaultRemotePath ?? ".", for: tab.id)
 
         if requiresLocalSSHOnly(connection, credential: credential) {
+            connection = markConnectionConnected(connection)
+            if persistsNewConnection {
+                connections.append(connection)
+                await persistConnections()
+                if let credential {
+                    try? await credentialStore.save(credential, for: connection.id)
+                }
+            }
             updateTab(
                 id: tab.id,
                 state: .connected,
@@ -254,6 +260,14 @@ extension AppState {
 
         do {
             let session = try await connectWithTimeout(record: connection, credential: credential)
+            connection = markConnectionConnected(connection)
+            if persistsNewConnection {
+                connections.append(connection)
+                await persistConnections()
+                if let credential {
+                    try? await credentialStore.save(credential, for: connection.id)
+                }
+            }
             updateTab(
                 id: tab.id,
                 state: .connected,
@@ -268,6 +282,11 @@ extension AppState {
         } catch {
             if connection.authentication.kind == .password, credential != nil, isSSHAuthenticationFailure(error) {
                 try? await credentialStore.delete(for: connection.id)
+                connection = markConnectionConnected(connection)
+                if persistsNewConnection {
+                    connections.append(connection)
+                    await persistConnections()
+                }
                 updateTab(
                     id: tab.id,
                     state: .connected,
@@ -425,7 +444,7 @@ extension AppState {
         ]
     }
 
-    func markConnectionUsed(_ connection: ConnectionRecord) -> ConnectionRecord {
+    func markConnectionConnected(_ connection: ConnectionRecord) -> ConnectionRecord {
         var connection = connection
         connection.lastConnectedAt = Date()
         connection.updatedAt = Date()

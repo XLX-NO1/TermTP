@@ -598,6 +598,32 @@ import TermCCore
 }
 
 @MainActor
+@Test func removeTrustedHostKeyAlsoRemovesMatchingLocalSSHKnownHostsEntry() async throws {
+    let state = AppState(connections: [])
+    let knownHostsURL = TermTPKnownHostsFile.defaultFileURL
+    try FileManager.default.createDirectory(
+        at: knownHostsURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    try """
+    example.com ssh-ed25519 AAAATEST
+    other.example.com ssh-ed25519 AAAAOTHER
+    [example.com]:2222 ssh-ed25519 AAAAPORT
+
+    """.write(to: knownHostsURL, atomically: true, encoding: .utf8)
+    try await state.hostKeyTrustStore.saveTrustedKey("ssh-ed25519 AAAATEST", host: "example.com", port: 22)
+    try await state.hostKeyTrustStore.saveTrustedKey("ssh-ed25519 AAAAOTHER", host: "other.example.com", port: 22)
+
+    state.removeTrustedHostKey(hostPort: "example.com:22")
+
+    let knownHosts = try String(contentsOf: knownHostsURL, encoding: .utf8)
+    #expect(!knownHosts.contains("example.com ssh-ed25519 AAAATEST"))
+    #expect(knownHosts.contains("other.example.com ssh-ed25519 AAAAOTHER"))
+    #expect(knownHosts.contains("[example.com]:2222 ssh-ed25519 AAAAPORT"))
+    #expect(await state.hostKeyTrustStore.trustedKey(host: "example.com", port: 22) == nil)
+}
+
+@MainActor
 @Test func connectDraftConnectionFailsAfterTimeout() async {
     let state = AppState(
         connections: [],
@@ -615,6 +641,55 @@ import TermCCore
 
     #expect(state.tabs.last?.state == .failed("连接超时，已等待 0.01 秒"))
     #expect(state.tabs.last?.transcript.contains("连接超时，已等待 0.01 秒") == true)
+    #expect(state.connections.isEmpty)
+}
+
+@MainActor
+@Test func connectDraftConnectionFailureDoesNotSavePassword() async {
+    let credentialStore = InMemoryCredentialStore()
+    let state = AppState(
+        connections: [],
+        language: .zhHans,
+        sshClient: FailingSSHClient(),
+        credentialStore: credentialStore
+    )
+    state.draftAlias = "Broken"
+    state.draftHost = "broken.example.com"
+    state.draftPort = "22"
+    state.draftUsername = "deploy"
+    state.draftPassword = "secret"
+
+    await state.connectDraftConnection()
+
+    #expect(state.connections.isEmpty)
+}
+
+@MainActor
+@Test func hostKeyTrustPromptsResolveInRequestOrder() async {
+    let store = AppHostKeyTrustStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).json"))
+    var visiblePrompts: [HostKeyPrompt?] = []
+    let first = HostKeyPrompt(host: "one.example.com", port: 22, key: "ssh-ed25519 AAAAONE", fingerprint: "SHA256:one")
+    let second = HostKeyPrompt(host: "two.example.com", port: 22, key: "ssh-ed25519 AAAATWO", fingerprint: "SHA256:two")
+    store.onPromptChanged = { visiblePrompts.append($0) }
+
+    let firstTask = Task { await store.requestTrust(for: first) }
+    await Task.yield()
+    let secondTask = Task { await store.requestTrust(for: second) }
+    await Task.yield()
+
+    #expect(store.pendingPrompt == first)
+    store.resolvePendingPrompt(trusted: true)
+    await Task.yield()
+    #expect(await firstTask.value)
+    #expect(store.pendingPrompt == second)
+
+    store.resolvePendingPrompt(trusted: false)
+    await Task.yield()
+    #expect(await secondTask.value == false)
+    #expect(store.pendingPrompt == nil)
+    #expect(await store.trustedKey(host: "one.example.com", port: 22) == "ssh-ed25519 AAAAONE")
+    #expect(await store.trustedKey(host: "two.example.com", port: 22) == nil)
+    #expect(visiblePrompts.compactMap { $0 } == [first, second])
 }
 
 @MainActor

@@ -17,6 +17,11 @@ extension AppState {
 
     func removeTrustedHostKey(hostPort: String) {
         hostKeyTrustStore.removeTrustedKey(hostPort: hostPort)
+        if let separator = hostPort.lastIndex(of: ":"),
+           let port = UInt16(hostPort[hostPort.index(after: separator)...]) {
+            let host = String(hostPort[..<separator])
+            try? TermTPKnownHostsFile.removeEntry(host: host, port: port)
+        }
         trustedHostKeyRevision += 1
     }
 

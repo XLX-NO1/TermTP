@@ -117,6 +117,26 @@ import TermCCore
 }
 
 @MainActor
+@Test func removeKnownHostsEntryKeepsOtherPortsAndHosts() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let url = directory.appendingPathComponent("known_hosts")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try """
+    example.com ssh-ed25519 AAAATEST
+    [example.com]:2222 ssh-ed25519 AAAAPORT
+    other.example.com ssh-ed25519 AAAAOTHER
+
+    """.write(to: url, atomically: true, encoding: .utf8)
+
+    try TermTPKnownHostsFile.removeEntry(host: "example.com", port: 22, from: url)
+
+    let knownHosts = try String(contentsOf: url, encoding: .utf8)
+    #expect(!knownHosts.contains("example.com ssh-ed25519 AAAATEST"))
+    #expect(knownHosts.contains("[example.com]:2222 ssh-ed25519 AAAAPORT"))
+    #expect(knownHosts.contains("other.example.com ssh-ed25519 AAAAOTHER"))
+}
+
+@MainActor
 @Test func launchArgumentsIncludeDynamicForwardingWithoutDestination() {
     let connection = ConnectionRecord(
         alias: "Proxy",
