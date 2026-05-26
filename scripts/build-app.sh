@@ -10,14 +10,14 @@ RESOURCES_DIR="$CONTENTS_DIR/Resources"
 
 cd "$ROOT_DIR"
 scripts/generate-icons.sh
-swift build -c debug --product TermCApp
+swift build -c debug --product TermTPApp
 SWIFT_BUILD_BIN_DIR="$(swift build -c debug --show-bin-path)"
 SWIFT_BUILD_BIN_DIR="$(cd "$SWIFT_BUILD_BIN_DIR" && pwd -P)"
-TERMC_EXECUTABLE="$SWIFT_BUILD_BIN_DIR/TermCApp"
+TERMTP_EXECUTABLE="$SWIFT_BUILD_BIN_DIR/TermTPApp"
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
-cp "$TERMC_EXECUTABLE" "$MACOS_DIR/TermTP"
+cp "$TERMTP_EXECUTABLE" "$MACOS_DIR/TermTP"
 cp "$BUILD_DIR/icons/TermTPIcon-1024.png" "$RESOURCES_DIR/TermTPIcon-1024.png"
 cp "$BUILD_DIR/icons/TermTPIcon.icns" "$RESOURCES_DIR/TermTPIcon.icns"
 cp "$BUILD_DIR/icons/TermTPMenuBarTemplate.png" "$RESOURCES_DIR/TermTPMenuBarTemplate.png"

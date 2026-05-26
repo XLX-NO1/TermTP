@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "TermC",
+    name: "TermTP",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .library(name: "TermCCore", targets: ["TermCCore"]),
-        .executable(name: "TermCApp", targets: ["TermCApp"]),
-        .executable(name: "TermCIconTool", targets: ["TermCIconTool"])
+        .library(name: "TermTPCore", targets: ["TermTPCore"]),
+        .executable(name: "TermTPApp", targets: ["TermTPApp"]),
+        .executable(name: "TermTPIconTool", targets: ["TermTPIconTool"])
     ],
     dependencies: [
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", revision: "73576f6f838414bab4c230cd1b56237bd16c3bbf"),
@@ -19,7 +19,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "TermCCore",
+            name: "TermTPCore",
             dependencies: [
                 .product(name: "Citadel", package: "Citadel"),
                 .product(name: "NIOSSH", package: "swift-nio-ssh"),
@@ -27,23 +27,23 @@ let package = Package(
             ]
         ),
         .executableTarget(
-            name: "TermCApp",
+            name: "TermTPApp",
             dependencies: [
-                "TermCCore",
+                "TermTPCore",
                 .product(name: "SwiftTerm", package: "SwiftTerm")
             ],
             resources: [.process("Resources")]
         ),
         .executableTarget(
-            name: "TermCIconTool"
+            name: "TermTPIconTool"
         ),
         .testTarget(
-            name: "TermCCoreTests",
-            dependencies: ["TermCCore"]
+            name: "TermTPCoreTests",
+            dependencies: ["TermTPCore"]
         ),
         .testTarget(
-            name: "TermCAppTests",
-            dependencies: ["TermCApp"]
+            name: "TermTPAppTests",
+            dependencies: ["TermTPApp"]
         )
     ]
 )

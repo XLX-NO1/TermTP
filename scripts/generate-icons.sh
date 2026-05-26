@@ -8,7 +8,7 @@ ICONSET_DIR="$ICONS_DIR/TermTPIcon.iconset"
 cd "$ROOT_DIR"
 mkdir -p "$ICONS_DIR"
 
-swift run TermCIconTool "$ICONS_DIR"
+swift run TermTPIconTool "$ICONS_DIR"
 
 rm -rf "$ICONSET_DIR"
 mkdir -p "$ICONSET_DIR"
