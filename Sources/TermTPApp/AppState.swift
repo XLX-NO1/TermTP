@@ -36,7 +36,7 @@ final class AppState {
 
     var isSidebarVisible = true
     var isSFTPDrawerVisible = true
-    var terminalFontSize = 11
+    var terminalFontSize = 9
     var terminalTheme: TerminalTheme {
         didSet {
             defaults.set(terminalTheme.rawValue, forKey: Self.terminalThemeDefaultsKey)

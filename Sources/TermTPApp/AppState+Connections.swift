@@ -259,7 +259,11 @@ extension AppState {
         }
 
         do {
-            let session = try await connectWithTimeout(record: connection, credential: credential)
+            let session = try await connectWithTimeout(
+                record: connection,
+                credential: credential,
+                suspendsWhileHostKeyPromptIsVisible: true
+            )
             connection = markConnectionConnected(connection)
             if persistsNewConnection {
                 connections.append(connection)

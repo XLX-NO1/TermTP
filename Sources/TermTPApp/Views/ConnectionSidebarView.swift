@@ -5,7 +5,7 @@ import TermTPCore
 struct ConnectionSidebarView: View {
     @Bindable var state: AppState
     @State private var searchText = ""
-    @State private var collapsedSections: Set<String> = []
+    @State private var expandedSections: Set<String> = []
 
     private var filteredConnections: [ConnectionRecord] {
         guard !searchText.isEmpty else {
@@ -38,10 +38,8 @@ struct ConnectionSidebarView: View {
     }
 
     private enum ConnectionSectionKind {
-        case recent
         case favorites
         case history
-        case normal
     }
 
     var body: some View {
@@ -66,29 +64,7 @@ struct ConnectionSidebarView: View {
 
             ScrollView(.vertical) {
                 LazyVStack(alignment: .leading, spacing: ConnectionSidebarLayout.sectionSpacing) {
-                    if searchText.isEmpty {
-                        connectionSection(state.t.recent, connections: state.recentConnections, kind: .recent)
-                    }
-
                     connectionSection(state.t.favorites, connections: favorites, kind: .favorites)
-
-                    if searchText.isEmpty {
-                        ForEach(state.connectionTags, id: \.self) { tag in
-                            connectionSection(
-                                "#\(tag)",
-                                connections: state.connections.filter { $0.tags.contains(tag) },
-                                kind: .normal
-                            )
-                        }
-
-                        ForEach(state.connectionGroups, id: \.self) { group in
-                            connectionSection(
-                                group,
-                                connections: state.connections.filter { $0.group == group },
-                                kind: .normal
-                            )
-                        }
-                    }
 
                     connectionSection(state.t.history, connections: history, kind: .history)
                 }
@@ -142,19 +118,19 @@ struct ConnectionSidebarView: View {
         kind: ConnectionSectionKind
     ) -> some View {
         let sectionID = "\(kind)-\(title)"
-        let isCollapsed = collapsedSections.contains(sectionID)
+        let isExpanded = expandedSections.contains(sectionID)
 
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: 4) {
             Button {
                 toggleSection(sectionID)
             } label: {
                 HStack(spacing: 5) {
-                    Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-                        .font(.system(size: 9, weight: .semibold))
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 8, weight: .semibold))
                         .frame(width: 10)
 
                     Text(title)
-                        .font(.caption)
+                        .font(.caption2)
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
                         .textCase(.uppercase)
@@ -170,7 +146,7 @@ struct ConnectionSidebarView: View {
             }
             .buttonStyle(.plain)
 
-            if isCollapsed {
+            if !isExpanded {
                 EmptyView()
             } else if connections.isEmpty {
                 emptySection
@@ -211,23 +187,19 @@ struct ConnectionSidebarView: View {
     }
 
     private func toggleSection(_ id: String) {
-        if collapsedSections.contains(id) {
-            collapsedSections.remove(id)
+        if expandedSections.contains(id) {
+            expandedSections.remove(id)
         } else {
-            collapsedSections.insert(id)
+            expandedSections.insert(id)
         }
     }
 
     private func deleteConnection(_ id: ConnectionRecord.ID, from kind: ConnectionSectionKind) {
         switch kind {
-        case .recent:
-            state.deleteRecentConnection(id)
         case .favorites:
             state.deleteFavoriteConnection(id)
         case .history:
             state.deleteHistoryConnection(id)
-        case .normal:
-            state.deleteConnection(id)
         }
     }
 
@@ -271,9 +243,11 @@ struct ConnectionSidebarView: View {
 }
 
 enum ConnectionSidebarLayout {
-    static let sectionSpacing: CGFloat = 8
+    static let sectionSpacing: CGFloat = 5
     static let footerSpacing: CGFloat = 7
-    static let collapsibleHeaderHeight: CGFloat = 22
+    static let collapsibleHeaderHeight: CGFloat = 18
+    static let primarySectionCount = 2
+    static let startsCollapsed = true
 }
 
 struct ConnectionSidebarActionStyle: ButtonStyle {

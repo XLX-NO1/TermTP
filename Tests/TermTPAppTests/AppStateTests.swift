@@ -40,6 +40,13 @@ import TermTPCore
     #expect(state.terminalFontSizeOptions == (8...12).map { $0 })
 }
 
+@MainActor
+@Test func terminalFontSizeDefaultsToNineOnLaunch() {
+    let state = AppState(connections: [])
+
+    #expect(state.terminalFontSize == 9)
+}
+
 @Test func terminalFontMetricsChangeForEveryAdjacentSize() {
     let sizes = Array(8...12)
     let metrics = sizes.map { TerminalFont.cellMetrics(for: $0, scale: 2) }
@@ -642,6 +649,40 @@ import TermTPCore
     #expect(state.tabs.last?.state == .failed("连接超时，已等待 0.01 秒"))
     #expect(state.tabs.last?.transcript.contains("连接超时，已等待 0.01 秒") == true)
     #expect(state.connections.isEmpty)
+}
+
+@MainActor
+@Test func connectDraftConnectionWaitsForHostKeyTrustBeforeConnectionTimeout() async {
+    let sshClient = HostKeyPromptingSSHClient()
+    let state = AppState(
+        connections: [],
+        sshClient: sshClient,
+        sftpService: RecordingSFTPService(filesByPath: [:]),
+        connectionTimeoutSeconds: 0.01
+    )
+    state.draftAlias = "LAN"
+    state.draftHost = "192.168.1.20"
+    state.draftPort = "22"
+    state.draftUsername = "deploy"
+    state.draftPassword = "secret"
+
+    let connectTask = Task {
+        await state.connectDraftConnection()
+    }
+    await sshClient.waitUntilPrompting()
+    state.pendingHostKeyPrompt = HostKeyPrompt(
+        host: "192.168.1.20",
+        port: 22,
+        key: "ssh-ed25519 AAAALAN",
+        fingerprint: "SHA256:lan"
+    )
+    try? await Task.sleep(for: .milliseconds(35))
+    state.pendingHostKeyPrompt = nil
+    await sshClient.finish()
+    await connectTask.value
+
+    #expect(state.tabs.last?.state == .connected)
+    #expect(state.connections.first?.host == "192.168.1.20")
 }
 
 @MainActor
@@ -1976,9 +2017,11 @@ private func writeFakeDownload(to path: String, offset: Int64, totalBytes: Int64
 
 @MainActor
 @Test func connectionSidebarKeepsActionsPinnedBelowScrollableSections() {
-    #expect(ConnectionSidebarLayout.sectionSpacing == 8)
+    #expect(ConnectionSidebarLayout.sectionSpacing == 5)
     #expect(ConnectionSidebarLayout.footerSpacing == 7)
-    #expect(ConnectionSidebarLayout.collapsibleHeaderHeight == 22)
+    #expect(ConnectionSidebarLayout.collapsibleHeaderHeight == 18)
+    #expect(ConnectionSidebarLayout.primarySectionCount == 2)
+    #expect(ConnectionSidebarLayout.startsCollapsed)
 }
 
 @MainActor
