@@ -576,6 +576,36 @@ import TermTPCore
 }
 
 @MainActor
+@Test func savedPasswordTransportFailureFallsBackToLocalSSHWithPassword() async {
+    let connection = ConnectionRecord(
+        alias: "LAN",
+        host: "192.168.3.55",
+        username: "root",
+        authentication: .password,
+        defaultRemotePath: "/root"
+    )
+    let credentialStore = InMemoryCredentialStore()
+    try? await credentialStore.save(.password("secret"), for: connection.id)
+    let state = AppState(
+        connections: [connection],
+        sshClient: NoRouteSSHClient(),
+        credentialStore: credentialStore,
+        sftpService: RecordingSFTPService(filesByPath: [:])
+    )
+
+    await state.connect(connection)
+
+    #expect(state.tabs.last?.state == .connected)
+    if case .ssh(let fallbackConnection, let credential) = state.tabs.last?.localProcess {
+        #expect(fallbackConnection.id == connection.id)
+        #expect(credential == .password("secret"))
+    } else {
+        Issue.record("Expected local SSH fallback with saved password")
+    }
+    #expect(state.remoteFiles.isEmpty)
+}
+
+@MainActor
 @Test func trustedHostKeyIsRememberedForNextConnection() async {
     let state = AppState(connections: [])
     let prompt = HostKeyPrompt(host: "example.com", port: 22, key: "ssh-ed25519 AAAATEST", fingerprint: "SHA256:test")
@@ -1652,6 +1682,12 @@ private struct AuthenticationFailingSSHClient: SSHClientProviding {
     }
 }
 
+private struct NoRouteSSHClient: SSHClientProviding {
+    func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
+        throw TestNoRouteFailure()
+    }
+}
+
 private actor HostKeyPromptingSSHClient: SSHClientProviding {
     private var promptStarted: CheckedContinuation<Void, Never>?
     private var connectCanFinish: CheckedContinuation<Void, Never>?
@@ -1685,6 +1721,12 @@ private actor HostKeyPromptingSSHClient: SSHClientProviding {
 
 private struct TestAuthenticationFailure: Error, CustomStringConvertible {
     var description: String { "allAuthenticationOptionsFailed" }
+}
+
+private struct TestNoRouteFailure: Error, CustomStringConvertible {
+    var description: String {
+        "Connection errors: SingleConnectionFailure(target: [IPv4]192.168.3.55/192.168.3.55:22, error: connect(descriptor:addr:size:): No route to host) (errno: 65))"
+    }
 }
 
 private actor RecordingSSHClient: SSHClientProviding {

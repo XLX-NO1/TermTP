@@ -306,6 +306,29 @@ extension AppState {
                 return
             }
 
+            if shouldFallbackToLocalSSHAfterTransportFailure(connection, credential: credential, error: error) {
+                connection = markConnectionConnected(connection)
+                if persistsNewConnection {
+                    connections.append(connection)
+                    await persistConnections()
+                    if let credential {
+                        try? await credentialStore.save(credential, for: connection.id)
+                    }
+                }
+                updateTab(
+                    id: tab.id,
+                    state: .connected,
+                    transcript: """
+                    \(t.connectedTo) \(connection.username)@\(connection.host):\(connection.port)
+
+                    """
+                )
+                attachSession(LocalSSHOnlySession(record: connection), to: tab.id)
+                attachLocalSSHProcess(to: tab.id, connection: connection, credential: credential)
+                updateRemoteFiles([], path: remotePath, tabID: tab.id)
+                return
+            }
+
             let message = String(describing: error)
             updateTab(
                 id: tab.id,
@@ -322,6 +345,22 @@ extension AppState {
     func requiresLocalSSHOnly(_ connection: ConnectionRecord, credential: Credential?) -> Bool {
         connection.requiresLocalSSHOnly
             || (connection.authentication.kind == .password && credential == nil)
+    }
+
+    func shouldFallbackToLocalSSHAfterTransportFailure(
+        _ connection: ConnectionRecord,
+        credential: Credential?,
+        error: any Error
+    ) -> Bool {
+        guard connection.authentication.kind == .password, credential != nil else {
+            return false
+        }
+
+        let description = String(describing: error)
+        return description.contains("No route to host")
+            || description.contains("Network is unreachable")
+            || description.contains("Connection refused")
+            || description.contains("Operation timed out")
     }
 
     func connectWithTimeout(
