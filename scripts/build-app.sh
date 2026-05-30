@@ -50,6 +50,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
     <string>TermTPIcon</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>TermTP 需要访问局域网内的 SSH/SFTP 服务器。</string>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>

@@ -1,4 +1,5 @@
 import AppKit
+import Network
 import SwiftTerm
 import SwiftUI
 import TermTPCore
@@ -93,6 +94,10 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         let directory = logURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
+        let localNetworkProbe = LocalNetworkProbe.run(
+            host: connection.host,
+            port: connection.port
+        )
         let route = ProcessRunner.run(
             executable: "/sbin/route",
             arguments: ["-n", "get", connection.host]
@@ -111,6 +116,8 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         args: \(([launch.executable] + launch.args).joined(separator: "\n"))
         environment:
         \(environment)
+        local-network-probe:
+        \(localNetworkProbe)
         route:
         \(route)
         port-check:
@@ -126,6 +133,63 @@ struct LocalSSHTerminalView: NSViewRepresentable {
                 try? handle.write(contentsOf: data)
             } else {
                 try? data.write(to: logURL, options: [.atomic])
+            }
+        }
+    }
+
+    private enum LocalNetworkProbe {
+        static func run(host: String, port: UInt16) -> String {
+            guard let endpointPort = NWEndpoint.Port(rawValue: port) else {
+                return "invalid port: \(port)"
+            }
+
+            let connection = NWConnection(
+                host: NWEndpoint.Host(host),
+                port: endpointPort,
+                using: .tcp
+            )
+            let queue = DispatchQueue(label: "local.termtp.local-network-probe")
+            let semaphore = DispatchSemaphore(value: 0)
+            let stateLog = StateLog()
+
+            connection.stateUpdateHandler = { state in
+                stateLog.append(String(describing: state))
+
+                switch state {
+                case .ready, .failed, .cancelled:
+                    semaphore.signal()
+                default:
+                    break
+                }
+            }
+
+            connection.start(queue: queue)
+            let waitResult = semaphore.wait(timeout: .now() + 3)
+            connection.cancel()
+
+            let output = stateLog.output()
+
+            if waitResult == .timedOut {
+                return "\(output)\n<timeout waiting for local network probe>"
+            }
+
+            return output
+        }
+
+        private final class StateLog: @unchecked Sendable {
+            private let lock = NSLock()
+            private var states: [String] = []
+
+            func append(_ state: String) {
+                lock.lock()
+                states.append(state)
+                lock.unlock()
+            }
+
+            func output() -> String {
+                lock.lock()
+                defer { lock.unlock() }
+                return states.isEmpty ? "<no state updates>" : states.joined(separator: "\n")
             }
         }
     }
