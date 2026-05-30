@@ -22,15 +22,30 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
             .appendingPathComponent("trusted-host-keys.json")
     }
 
+    static var defaultKnownHostsFileURLs: [URL] {
+        [
+            FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".ssh", isDirectory: true)
+                .appendingPathComponent("known_hosts"),
+            TermTPKnownHostsFile.defaultFileURL
+        ]
+    }
+
     private let fileURL: URL
     private var trustedKeys: [String: String]
     private var pendingRequests: [PendingHostKeyRequest] = []
     var pendingPrompt: HostKeyPrompt?
     var onPromptChanged: ((HostKeyPrompt?) -> Void)?
 
-    init(fileURL: URL = AppHostKeyTrustStore.defaultFileURL) {
+    init(
+        fileURL: URL = AppHostKeyTrustStore.defaultFileURL,
+        knownHostsFileURLs: [URL] = AppHostKeyTrustStore.defaultKnownHostsFileURLs
+    ) {
         self.fileURL = fileURL
-        self.trustedKeys = (try? Self.loadTrustedKeys(from: fileURL)) ?? [:]
+        var trustedKeys = (try? Self.loadTrustedKeys(from: fileURL)) ?? [:]
+        trustedKeys.merge(Self.loadKnownHosts(from: knownHostsFileURLs)) { current, _ in current }
+        self.trustedKeys = trustedKeys
+        try? Self.persistTrustedKeys(trustedKeys, to: fileURL)
     }
 
     func trustedKey(host: String, port: UInt16) async -> String? {
@@ -114,6 +129,87 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
             [.posixPermissions: 0o600],
             ofItemAtPath: fileURL.path
         )
+    }
+
+    private static func loadKnownHosts(from fileURLs: [URL]) -> [String: String] {
+        fileURLs.reduce(into: [:]) { keys, fileURL in
+            guard let contents = try? String(contentsOf: fileURL, encoding: .utf8) else {
+                return
+            }
+
+            for line in contents.split(whereSeparator: \.isNewline) {
+                guard let knownHost = parseKnownHostLine(String(line)) else {
+                    continue
+                }
+
+                for hostPort in knownHost.hostPorts {
+                    keys[hostPort] = knownHost.key
+                }
+            }
+        }
+    }
+
+    private static func parseKnownHostLine(_ line: String) -> (hostPorts: [String], key: String)? {
+        let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedLine.isEmpty, !trimmedLine.hasPrefix("#") else {
+            return nil
+        }
+
+        let parts = trimmedLine.split(separator: " ", omittingEmptySubsequences: true)
+        let offset = parts.first?.hasPrefix("@") == true ? 1 : 0
+        guard parts.count >= offset + 3 else {
+            return nil
+        }
+
+        let hosts = parts[offset]
+        guard !hosts.hasPrefix("|") else {
+            return nil
+        }
+
+        let keyType = parts[offset + 1]
+        let keyBody = parts[offset + 2]
+        guard keyType.hasPrefix("ssh-") || keyType.hasPrefix("ecdsa-") else {
+            return nil
+        }
+
+        let hostPorts = hosts
+            .split(separator: ",")
+            .compactMap(Self.hostPort(fromKnownHostsEntry:))
+        guard !hostPorts.isEmpty else {
+            return nil
+        }
+
+        return (hostPorts, "\(keyType) \(keyBody)")
+    }
+
+    private static func hostPort(fromKnownHostsEntry entry: Substring) -> String? {
+        guard !entry.isEmpty else {
+            return nil
+        }
+
+        if entry.first == "[" {
+            guard
+                let closingBracketIndex = entry.firstIndex(of: "]"),
+                closingBracketIndex < entry.index(before: entry.endIndex)
+            else {
+                return nil
+            }
+
+            let host = entry[entry.index(after: entry.startIndex)..<closingBracketIndex]
+            let separatorIndex = entry.index(after: closingBracketIndex)
+            guard entry[separatorIndex] == ":" else {
+                return nil
+            }
+
+            let port = entry[entry.index(after: separatorIndex)...]
+            guard !host.isEmpty, UInt16(port) != nil else {
+                return nil
+            }
+
+            return "\(host):\(port)"
+        }
+
+        return "\(entry):22"
     }
 }
 
