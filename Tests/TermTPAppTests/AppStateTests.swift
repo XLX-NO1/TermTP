@@ -606,6 +606,37 @@ import TermTPCore
 }
 
 @MainActor
+@Test func savedPasswordTransportFailureAutoConnectsSFTPAfterLocalSSHFallback() async {
+    let connection = ConnectionRecord(
+        alias: "LAN",
+        host: "192.168.3.55",
+        username: "root",
+        authentication: .password,
+        defaultRemotePath: "/root"
+    )
+    let credentialStore = InMemoryCredentialStore()
+    try? await credentialStore.save(.password("secret"), for: connection.id)
+    let sshClient = FailsFirstThenRecordsSSHClient()
+    let sftpService = RecordingSFTPService(filesByPath: [
+        "/root": [RemoteFile(name: "deploy.sh", path: "/root/deploy.sh", kind: .file, size: 8)]
+    ])
+    let state = AppState(
+        connections: [connection],
+        sshClient: sshClient,
+        credentialStore: credentialStore,
+        sftpService: sftpService
+    )
+
+    await state.connect(connection)
+
+    #expect(state.tabs.last?.state == .connected)
+    #expect(await sshClient.credentials == [.password("secret"), .password("secret")])
+    #expect(state.pendingSFTPCredentialPrompt == nil)
+    #expect(state.remoteFiles == [RemoteFile(name: "deploy.sh", path: "/root/deploy.sh", kind: .file, size: 8)])
+    #expect(await sftpService.listedPaths == ["/root"])
+}
+
+@MainActor
 @Test func trustedHostKeyIsRememberedForNextConnection() async {
     let state = AppState(connections: [])
     let prompt = HostKeyPrompt(host: "example.com", port: 22, key: "ssh-ed25519 AAAATEST", fingerprint: "SHA256:test")
@@ -1685,6 +1716,19 @@ private struct AuthenticationFailingSSHClient: SSHClientProviding {
 private struct NoRouteSSHClient: SSHClientProviding {
     func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
         throw TestNoRouteFailure()
+    }
+}
+
+private actor FailsFirstThenRecordsSSHClient: SSHClientProviding {
+    private(set) var credentials: [Credential?] = []
+
+    func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
+        credentials.append(credential)
+        if credentials.count == 1 {
+            throw TestNoRouteFailure()
+        }
+
+        return FakeSSHSession(record: record)
     }
 }
 
