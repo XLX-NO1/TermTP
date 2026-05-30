@@ -147,6 +147,22 @@ import TermTPCore
 }
 
 @MainActor
+@Test func launchDebugCommandShellQuotesArguments() {
+    let launch = LocalSSHTerminalView.LaunchConfiguration(
+        executable: "/usr/bin/ssh",
+        args: [
+            "-o",
+            "UserKnownHostsFile=/Users/me/Library/Application\\ Support/TermTP/known_hosts",
+            "root@192.168.3.55"
+        ],
+        environment: nil
+    )
+
+    #expect(launch.debugCommand.contains("'UserKnownHostsFile=/Users/me/Library/Application\\ Support/TermTP/known_hosts'"))
+    #expect(launch.debugCommand.hasSuffix("root@192.168.3.55"))
+}
+
+@MainActor
 @Test func launchArgumentsEscapeOpenSSHOptionValuesWithSpaces() {
     #expect(LocalSSHTerminalView.openSSHOptionValue("/Users/me/Library/Application Support/TermTP/known_hosts") == "/Users/me/Library/Application\\ Support/TermTP/known_hosts")
 }

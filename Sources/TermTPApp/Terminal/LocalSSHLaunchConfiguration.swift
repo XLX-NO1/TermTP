@@ -13,6 +13,22 @@ extension LocalSSHTerminalView {
         var executable: String
         var args: [String]
         var environment: [String]?
+
+        var debugCommand: String {
+            ([executable] + args).map(Self.shellQuoted).joined(separator: " ")
+        }
+
+        private static func shellQuoted(_ value: String) -> String {
+            guard !value.isEmpty else {
+                return "''"
+            }
+
+            if value.rangeOfCharacter(from: CharacterSet(charactersIn: " \t\n\"'\\$`")) == nil {
+                return value
+            }
+
+            return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        }
     }
 
     static func password(from credential: Credential?) -> String? {

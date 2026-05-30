@@ -71,6 +71,8 @@ struct LocalSSHTerminalView: NSViewRepresentable {
             credential: credential,
             askPass: askPass
         )
+        Self.writeDebugLog(for: connection, launch: launch)
+        terminalView.feed(text: "TermTP SSH: \(launch.debugCommand)\r\n")
         terminalView.startProcess(
             executable: launch.executable,
             args: launch.args,
@@ -78,6 +80,75 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         )
         context.coordinator.onCommandHandled = onCommandHandled
         context.coordinator.lastSentCommandID = nil
+    }
+
+    private static func writeDebugLog(
+        for connection: ConnectionRecord,
+        launch: LaunchConfiguration
+    ) {
+        let logURL = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("TermTP", isDirectory: true)
+            .appendingPathComponent("ssh-debug.log")
+        let directory = logURL.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let route = ProcessRunner.run(
+            executable: "/sbin/route",
+            arguments: ["-n", "get", connection.host]
+        )
+        let nc = ProcessRunner.run(
+            executable: "/usr/bin/nc",
+            arguments: ["-vz", "-G", "3", connection.host, String(connection.port)]
+        )
+
+        let environment = launch.environment?.joined(separator: "\n") ?? "<default>"
+        let entry = """
+
+        === \(Date()) ===
+        target: \(connection.username)@\(connection.host):\(connection.port)
+        command: \(launch.debugCommand)
+        args: \(([launch.executable] + launch.args).joined(separator: "\n"))
+        environment:
+        \(environment)
+        route:
+        \(route)
+        port-check:
+        \(nc)
+
+        """
+
+        if let data = entry.data(using: .utf8) {
+            if FileManager.default.fileExists(atPath: logURL.path),
+               let handle = try? FileHandle(forWritingTo: logURL) {
+                defer { try? handle.close() }
+                _ = try? handle.seekToEnd()
+                try? handle.write(contentsOf: data)
+            } else {
+                try? data.write(to: logURL, options: [.atomic])
+            }
+        }
+    }
+
+    private enum ProcessRunner {
+        static func run(executable: String, arguments: [String]) -> String {
+            let process = Process()
+            let pipe = Pipe()
+            process.executableURL = URL(fileURLWithPath: executable)
+            process.arguments = arguments
+            process.standardOutput = pipe
+            process.standardError = pipe
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(decoding: data, as: UTF8.self)
+                return output.isEmpty ? "<empty>" : output
+            } catch {
+                return String(describing: error)
+            }
+        }
     }
 
     final class Coordinator {
