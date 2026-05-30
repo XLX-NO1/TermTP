@@ -545,7 +545,7 @@ import TermTPCore
 }
 
 @MainActor
-@Test func savedPasswordAuthenticationFailureFallsBackToInteractiveLocalSSH() async {
+@Test func savedPasswordAuthenticationFailureKeepsTerminalOnSystemSSHAndPromptsForSFTPPassword() async {
     let connection = ConnectionRecord(
         alias: "Saved Password",
         host: "example.com",
@@ -568,11 +568,14 @@ import TermTPCore
     #expect(state.tabs.last?.state == .connected)
     if case .ssh(let fallbackConnection, let credential) = state.tabs.last?.localProcess {
         #expect(fallbackConnection.id == connection.id)
-        #expect(credential == nil)
+        #expect(credential == .password("stale"))
     } else {
-        Issue.record("Expected interactive local SSH fallback")
+        Issue.record("Expected local SSH terminal")
     }
-    #expect(state.notification?.message == "保存的密码认证失败，请在终端中手动输入密码")
+    let savedCredential = try? await credentialStore.load(for: connection.id)
+    #expect(savedCredential == nil)
+    #expect(state.pendingSFTPCredentialPrompt?.connection.id == connection.id)
+    #expect(state.notification?.message == "认证失败，请重新输入密码")
 }
 
 @MainActor
@@ -616,7 +619,7 @@ import TermTPCore
     )
     let credentialStore = InMemoryCredentialStore()
     try? await credentialStore.save(.password("secret"), for: connection.id)
-    let sshClient = FailsFirstThenRecordsSSHClient()
+    let sshClient = RecordingSSHClient()
     let sftpService = RecordingSFTPService(filesByPath: [
         "/root": [RemoteFile(name: "deploy.sh", path: "/root/deploy.sh", kind: .file, size: 8)]
     ])
@@ -630,7 +633,7 @@ import TermTPCore
     await state.connect(connection)
 
     #expect(state.tabs.last?.state == .connected)
-    #expect(await sshClient.credentials == [.password("secret"), .password("secret")])
+    #expect(await sshClient.credentials == [.password("secret")])
     #expect(state.pendingSFTPCredentialPrompt == nil)
     #expect(state.remoteFiles == [RemoteFile(name: "deploy.sh", path: "/root/deploy.sh", kind: .file, size: 8)])
     #expect(await sftpService.listedPaths == ["/root"])
@@ -729,7 +732,8 @@ import TermTPCore
     state.draftHost = "example.com"
     state.draftPort = "22"
     state.draftUsername = "deploy"
-    state.draftPassword = "secret"
+    state.draftUsesKey = true
+    state.draftPrivateKeyPath = "/tmp/slow-key"
 
     await state.connectDraftConnection()
 
@@ -773,7 +777,7 @@ import TermTPCore
 }
 
 @MainActor
-@Test func connectDraftConnectionFailureDoesNotSavePassword() async {
+@Test func connectDraftPasswordConnectionPersistsWhenBackgroundSFTPConnectionFails() async {
     let credentialStore = InMemoryCredentialStore()
     let state = AppState(
         connections: [],
@@ -789,7 +793,13 @@ import TermTPCore
 
     await state.connectDraftConnection()
 
-    #expect(state.connections.isEmpty)
+    #expect(state.connections.count == 1)
+    #expect(state.tabs.last?.state == .connected)
+    #expect(state.tabs.last?.localProcess == .ssh(state.connections[0], credential: .password("secret")))
+    let savedCredential = try? await credentialStore.load(for: state.connections[0].id)
+    #expect(savedCredential == .password("secret"))
+    #expect(state.remoteFiles.isEmpty)
+    #expect(state.notification?.message.contains("刷新远程文件失败") == true)
 }
 
 @MainActor
@@ -1742,19 +1752,6 @@ private struct AuthenticationFailingSSHClient: SSHClientProviding {
 private struct NoRouteSSHClient: SSHClientProviding {
     func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
         throw TestNoRouteFailure()
-    }
-}
-
-private actor FailsFirstThenRecordsSSHClient: SSHClientProviding {
-    private(set) var credentials: [Credential?] = []
-
-    func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
-        credentials.append(credential)
-        if credentials.count == 1 {
-            throw TestNoRouteFailure()
-        }
-
-        return FakeSSHSession(record: record)
     }
 }
 

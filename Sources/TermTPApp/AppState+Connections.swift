@@ -255,6 +255,9 @@ extension AppState {
             attachSession(LocalSSHOnlySession(record: connection), to: tab.id)
             attachLocalSSHProcess(to: tab.id, connection: connection, credential: credential)
             updateRemoteFiles([], path: remotePath, tabID: tab.id)
+            if shouldAutoConnectSFTPAfterLocalSSH(connection, credential: credential) {
+                await connectSFTPForSelectedTab()
+            }
             return
         }
 
@@ -345,7 +348,13 @@ extension AppState {
 
     func requiresLocalSSHOnly(_ connection: ConnectionRecord, credential: Credential?) -> Bool {
         connection.requiresLocalSSHOnly
-            || (connection.authentication.kind == .password && credential == nil)
+            || connection.authentication.kind == .password
+    }
+
+    func shouldAutoConnectSFTPAfterLocalSSH(_ connection: ConnectionRecord, credential: Credential?) -> Bool {
+        !connection.requiresLocalSSHOnly
+            && connection.authentication.kind == .password
+            && credential != nil
     }
 
     func shouldFallbackToLocalSSHAfterTransportFailure(
