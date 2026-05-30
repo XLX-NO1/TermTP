@@ -91,7 +91,7 @@ import TermTPCore
         "-o",
         "StrictHostKeyChecking=ask",
         "-o",
-        "UserKnownHostsFile=\(LocalSSHTerminalView.knownHostsFileURL.path)",
+        "UserKnownHostsFile=\(LocalSSHTerminalView.openSSHOptionValue(LocalSSHTerminalView.knownHostsFileURL.path))",
         "-p",
         "2222",
         "deploy@prod.example.com"
@@ -109,11 +109,16 @@ import TermTPCore
         "-o",
         "StrictHostKeyChecking=ask",
         "-o",
-        "UserKnownHostsFile=\(LocalSSHTerminalView.knownHostsFileURL.path)",
+        "UserKnownHostsFile=\(LocalSSHTerminalView.openSSHOptionValue(LocalSSHTerminalView.knownHostsFileURL.path))",
         "-p",
         "22",
         "me@localhost"
     ])
+}
+
+@MainActor
+@Test func launchArgumentsEscapeOpenSSHOptionValuesWithSpaces() {
+    #expect(LocalSSHTerminalView.openSSHOptionValue("/Users/me/Library/Application Support/TermTP/known_hosts") == "/Users/me/Library/Application\\ Support/TermTP/known_hosts")
 }
 
 @MainActor

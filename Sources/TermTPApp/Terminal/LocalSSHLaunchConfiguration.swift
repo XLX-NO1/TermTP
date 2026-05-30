@@ -134,7 +134,7 @@ extension LocalSSHTerminalView {
     ) -> [String] {
         var args = [
             "-o", "StrictHostKeyChecking=accept-new",
-            "-o", "UserKnownHostsFile=\(knownHostsFileURL.path)",
+            "-o", "UserKnownHostsFile=\(openSSHOptionValue(knownHostsFileURL.path))",
             "-p", String(connection.port),
             "\(connection.username)@\(connection.host)"
         ]
@@ -163,6 +163,13 @@ extension LocalSSHTerminalView {
         }
 
         return args
+    }
+
+    static func openSSHOptionValue(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: " ", with: "\\ ")
+            .replacingOccurrences(of: "\t", with: "\\\t")
     }
 
     private static func sshArguments(for forward: ConnectionRecord.PortForward) -> [String] {
