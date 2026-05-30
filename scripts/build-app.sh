@@ -58,6 +58,12 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-codesign --force --deep --sign - --identifier local.termtp.app "$APP_DIR"
+codesign \
+    --force \
+    --deep \
+    --sign - \
+    --identifier local.termtp.app \
+    --entitlements "$ROOT_DIR/Packaging/TermTP.entitlements" \
+    "$APP_DIR"
 
 echo "$APP_DIR"
