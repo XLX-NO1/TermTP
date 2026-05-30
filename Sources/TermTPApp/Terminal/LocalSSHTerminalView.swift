@@ -106,6 +106,10 @@ struct LocalSSHTerminalView: NSViewRepresentable {
             executable: "/usr/bin/nc",
             arguments: ["-vz", "-G", "3", connection.host, String(connection.port)]
         )
+        let ncWithoutConnectX = ProcessRunner.run(
+            executable: "/usr/bin/nc",
+            arguments: ["-vz", "-G", "3", "-O", connection.host, String(connection.port)]
+        )
 
         let environment = launch.environment?.joined(separator: "\n") ?? "<default>"
         let entry = """
@@ -122,6 +126,8 @@ struct LocalSSHTerminalView: NSViewRepresentable {
         \(route)
         port-check:
         \(nc)
+        port-check-without-connectx:
+        \(ncWithoutConnectX)
 
         """
 

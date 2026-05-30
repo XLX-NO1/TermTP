@@ -157,6 +157,10 @@ extension LocalSSHTerminalView {
             "\(connection.username)@\(connection.host)"
         ]
 
+        if connection.jumpHost == nil {
+            args.insert(contentsOf: ["-o", "ProxyCommand=/usr/bin/nc -O %h %p"], at: args.count - 3)
+        }
+
         if promptsForUnknownHostKey {
             if let index = args.firstIndex(of: "StrictHostKeyChecking=accept-new") {
                 args[index] = "StrictHostKeyChecking=ask"

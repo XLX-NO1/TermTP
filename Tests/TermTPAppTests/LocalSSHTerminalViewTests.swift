@@ -115,7 +115,7 @@ import TermTPCore
         credential: nil
     )
 
-    #expect(launch.args.suffix(11) == [
+    #expect(launch.args.suffix(13) == [
         "-F",
         "/dev/null",
         "-o",
@@ -124,6 +124,8 @@ import TermTPCore
         "GlobalKnownHostsFile=/dev/null",
         "-o",
         "UserKnownHostsFile=\(LocalSSHTerminalView.openSSHOptionValue(LocalSSHTerminalView.knownHostsFileURL.path))",
+        "-o",
+        "ProxyCommand=/usr/bin/nc -O %h %p",
         "-p",
         "22",
         "me@localhost"
@@ -141,6 +143,7 @@ import TermTPCore
     #expect(launch.args.contains("/dev/null"))
     #expect(launch.args.contains("GlobalKnownHostsFile=/dev/null"))
     #expect(launch.args.contains("UserKnownHostsFile=\(LocalSSHTerminalView.openSSHOptionValue(LocalSSHTerminalView.knownHostsFileURL.path))"))
+    #expect(launch.args.contains("ProxyCommand=/usr/bin/nc -O %h %p"))
     #expect(launch.args.contains("PreferredAuthentications=password"))
     #expect(launch.args.contains("PubkeyAuthentication=no"))
     #expect(!launch.args.contains("IdentityAgent=none"))
