@@ -32,6 +32,7 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
     }
 
     private let fileURL: URL
+    private let knownHostsFileURLs: [URL]
     private var trustedKeys: [String: String]
     private var pendingRequests: [PendingHostKeyRequest] = []
     var pendingPrompt: HostKeyPrompt?
@@ -42,14 +43,23 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
         knownHostsFileURLs: [URL] = AppHostKeyTrustStore.defaultKnownHostsFileURLs
     ) {
         self.fileURL = fileURL
-        var trustedKeys = (try? Self.loadTrustedKeys(from: fileURL)) ?? [:]
-        trustedKeys.merge(Self.loadKnownHosts(from: knownHostsFileURLs)) { current, _ in current }
-        self.trustedKeys = trustedKeys
-        try? Self.persistTrustedKeys(trustedKeys, to: fileURL)
+        self.knownHostsFileURLs = knownHostsFileURLs
+        self.trustedKeys = (try? Self.loadTrustedKeys(from: fileURL)) ?? [:]
     }
 
     func trustedKey(host: String, port: UInt16) async -> String? {
-        trustedKeys[key(for: host, port: port)]
+        let hostPort = key(for: host, port: port)
+        if let trustedKey = trustedKeys[hostPort] {
+            return trustedKey
+        }
+
+        guard let knownHostKey = Self.loadKnownHost(hostPort: hostPort, from: knownHostsFileURLs) else {
+            return nil
+        }
+
+        trustedKeys[hostPort] = knownHostKey
+        try? Self.persistTrustedKeys(trustedKeys, to: fileURL)
+        return knownHostKey
     }
 
     func saveTrustedKey(_ key: String, host: String, port: UInt16) async throws {
@@ -131,10 +141,10 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
         )
     }
 
-    private static func loadKnownHosts(from fileURLs: [URL]) -> [String: String] {
-        fileURLs.reduce(into: [:]) { keys, fileURL in
+    private static func loadKnownHost(hostPort: String, from fileURLs: [URL]) -> String? {
+        for fileURL in fileURLs {
             guard let contents = try? String(contentsOf: fileURL, encoding: .utf8) else {
-                return
+                continue
             }
 
             for line in contents.split(whereSeparator: \.isNewline) {
@@ -142,11 +152,13 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
                     continue
                 }
 
-                for hostPort in knownHost.hostPorts {
-                    keys[hostPort] = knownHost.key
+                if knownHost.hostPorts.contains(hostPort) {
+                    return knownHost.key
                 }
             }
         }
+
+        return nil
     }
 
     private static func parseKnownHostLine(_ line: String) -> (hostPorts: [String], key: String)? {

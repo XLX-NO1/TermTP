@@ -667,6 +667,7 @@ import TermTPCore
 
     let store = AppHostKeyTrustStore(fileURL: trustedKeysURL, knownHostsFileURLs: [knownHostsURL])
 
+    #expect(store.trustedHostKeys.isEmpty)
     #expect(await store.trustedKey(host: "192.168.3.55", port: 22) == "ssh-ed25519 AAAALAN")
     #expect(await store.trustedKey(host: "example.com", port: 2222) == "ssh-rsa AAAAPORT")
     #expect(store.trustedHostKeys.map(\.hostPort) == ["192.168.3.55:22", "example.com:2222"])
