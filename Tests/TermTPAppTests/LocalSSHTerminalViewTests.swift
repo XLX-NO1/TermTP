@@ -22,6 +22,12 @@ import TermTPCore
     #expect(launch.environment?.contains("TERMTP_SSH_PASSWORD=secret") == false)
     #expect(launch.environment?.contains("TERMTP_SSH_PASSWORD_FILE=/tmp/termtp-test-askpass/password") == true)
     #expect(launch.args.contains("StrictHostKeyChecking=accept-new"))
+    #expect(launch.args.contains("-F"))
+    #expect(launch.args.contains("/dev/null"))
+    #expect(launch.args.contains("GlobalKnownHostsFile=/dev/null"))
+    #expect(launch.args.contains("PreferredAuthentications=password"))
+    #expect(launch.args.contains("PubkeyAuthentication=no"))
+    #expect(launch.args.contains("NumberOfPasswordPrompts=1"))
 }
 
 @MainActor
@@ -87,9 +93,13 @@ import TermTPCore
     #expect(launch.args.contains("jump.example.com"))
     #expect(launch.args.contains("-L"))
     #expect(launch.args.contains("127.0.0.1:8080:localhost:80"))
-    #expect(launch.args.suffix(7) == [
+    #expect(launch.args.suffix(11) == [
+        "-F",
+        "/dev/null",
         "-o",
         "StrictHostKeyChecking=ask",
+        "-o",
+        "GlobalKnownHostsFile=/dev/null",
         "-o",
         "UserKnownHostsFile=\(LocalSSHTerminalView.openSSHOptionValue(LocalSSHTerminalView.knownHostsFileURL.path))",
         "-p",
@@ -105,15 +115,35 @@ import TermTPCore
         credential: nil
     )
 
-    #expect(launch.args.suffix(7) == [
+    #expect(launch.args.suffix(11) == [
+        "-F",
+        "/dev/null",
         "-o",
         "StrictHostKeyChecking=ask",
+        "-o",
+        "GlobalKnownHostsFile=/dev/null",
         "-o",
         "UserKnownHostsFile=\(LocalSSHTerminalView.openSSHOptionValue(LocalSSHTerminalView.knownHostsFileURL.path))",
         "-p",
         "22",
         "me@localhost"
     ])
+}
+
+@MainActor
+@Test func passwordLaunchArgumentsDoNotUseSystemSSHIdentitySources() {
+    let launch = LocalSSHTerminalView.launchConfiguration(
+        for: ConnectionRecord.samplePassword,
+        credential: Credential.password("secret")
+    )
+
+    #expect(launch.args.contains("-F"))
+    #expect(launch.args.contains("/dev/null"))
+    #expect(launch.args.contains("GlobalKnownHostsFile=/dev/null"))
+    #expect(launch.args.contains("UserKnownHostsFile=\(LocalSSHTerminalView.openSSHOptionValue(LocalSSHTerminalView.knownHostsFileURL.path))"))
+    #expect(launch.args.contains("PreferredAuthentications=password"))
+    #expect(launch.args.contains("PubkeyAuthentication=no"))
+    #expect(!launch.args.contains("IdentityAgent=none"))
 }
 
 @MainActor

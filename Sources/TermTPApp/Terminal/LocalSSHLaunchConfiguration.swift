@@ -133,18 +133,32 @@ extension LocalSSHTerminalView {
         promptsForUnknownHostKey: Bool
     ) -> [String] {
         var args = [
+            "-F", "/dev/null",
             "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "GlobalKnownHostsFile=/dev/null",
             "-o", "UserKnownHostsFile=\(openSSHOptionValue(knownHostsFileURL.path))",
             "-p", String(connection.port),
             "\(connection.username)@\(connection.host)"
         ]
 
         if promptsForUnknownHostKey {
-            args[1] = "StrictHostKeyChecking=ask"
+            if let index = args.firstIndex(of: "StrictHostKeyChecking=accept-new") {
+                args[index] = "StrictHostKeyChecking=ask"
+            }
         }
 
         if case .publicKey(let privateKeyPath) = connection.authentication {
             args.insert(contentsOf: ["-i", privateKeyPath], at: 0)
+            args.insert(contentsOf: [
+                "-o", "IdentitiesOnly=yes",
+                "-o", "IdentityAgent=none"
+            ], at: 0)
+        } else {
+            args.insert(contentsOf: [
+                "-o", "PreferredAuthentications=password",
+                "-o", "PubkeyAuthentication=no",
+                "-o", "NumberOfPasswordPrompts=1"
+            ], at: 0)
         }
 
         if connection.keepAlive.isEnabled {

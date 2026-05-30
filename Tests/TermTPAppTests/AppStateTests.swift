@@ -654,7 +654,7 @@ import TermTPCore
 }
 
 @MainActor
-@Test func hostKeyTrustStoreImportsReadableKnownHostsEntries() async throws {
+@Test func hostKeyTrustStoreDoesNotImportSystemKnownHostsEntries() async throws {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
     let trustedKeysURL = directory.appendingPathComponent("trusted-host-keys.json")
@@ -668,15 +668,12 @@ import TermTPCore
 
     """.write(to: knownHostsURL, atomically: true, encoding: .utf8)
 
-    let store = AppHostKeyTrustStore(fileURL: trustedKeysURL, knownHostsFileURLs: [knownHostsURL])
+    let store = AppHostKeyTrustStore(fileURL: trustedKeysURL)
 
     #expect(store.trustedHostKeys.isEmpty)
-    #expect(await store.trustedKey(host: "192.168.3.55", port: 22) == "ssh-ed25519 AAAALAN")
-    #expect(await store.trustedKey(host: "example.com", port: 2222) == "ssh-rsa AAAAPORT")
-    #expect(store.trustedHostKeys.map(\.hostPort) == ["192.168.3.55:22", "example.com:2222"])
-
-    let persisted = try JSONDecoder.termtp.decode([String: String].self, from: Data(contentsOf: trustedKeysURL))
-    #expect(persisted["192.168.3.55:22"] == "ssh-ed25519 AAAALAN")
+    #expect(await store.trustedKey(host: "192.168.3.55", port: 22) == nil)
+    #expect(await store.trustedKey(host: "example.com", port: 2222) == nil)
+    #expect(!FileManager.default.fileExists(atPath: trustedKeysURL.path))
 }
 
 @MainActor
