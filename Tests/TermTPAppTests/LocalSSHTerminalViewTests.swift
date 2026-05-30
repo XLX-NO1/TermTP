@@ -21,6 +21,8 @@ import TermTPCore
     #expect(launch.environment?.contains("SSH_ASKPASS=\(askPassScriptPath)") == true)
     #expect(launch.environment?.contains("TERMTP_SSH_PASSWORD=secret") == false)
     #expect(launch.environment?.contains("TERMTP_SSH_PASSWORD_FILE=/tmp/termtp-test-askpass/password") == true)
+    #expect(launch.executable == "/bin/launchctl")
+    #expect(launch.args.prefix(3) == ["asuser", String(getuid()), "/usr/bin/ssh"])
     #expect(launch.args.contains("StrictHostKeyChecking=accept-new"))
     #expect(launch.args.contains("-F"))
     #expect(launch.args.contains("/dev/null"))
@@ -39,6 +41,8 @@ import TermTPCore
 
     #expect(launch.environment?.contains("TERM=xterm-256color") == true)
     #expect(launch.environment?.contains("SSH_ASKPASS_REQUIRE=force") == false)
+    #expect(launch.executable == "/bin/launchctl")
+    #expect(launch.args.prefix(3) == ["asuser", String(getuid()), "/usr/bin/ssh"])
 }
 
 @MainActor
@@ -115,7 +119,7 @@ import TermTPCore
         credential: nil
     )
 
-    #expect(launch.args.suffix(13) == [
+    #expect(launch.args.suffix(11) == [
         "-F",
         "/dev/null",
         "-o",
@@ -124,8 +128,6 @@ import TermTPCore
         "GlobalKnownHostsFile=/dev/null",
         "-o",
         "UserKnownHostsFile=\(LocalSSHTerminalView.openSSHOptionValue(LocalSSHTerminalView.knownHostsFileURL.path))",
-        "-o",
-        "ProxyCommand=/usr/bin/nc -O %h %p",
         "-p",
         "22",
         "me@localhost"
@@ -143,7 +145,6 @@ import TermTPCore
     #expect(launch.args.contains("/dev/null"))
     #expect(launch.args.contains("GlobalKnownHostsFile=/dev/null"))
     #expect(launch.args.contains("UserKnownHostsFile=\(LocalSSHTerminalView.openSSHOptionValue(LocalSSHTerminalView.knownHostsFileURL.path))"))
-    #expect(launch.args.contains("ProxyCommand=/usr/bin/nc -O %h %p"))
     #expect(launch.args.contains("PreferredAuthentications=password"))
     #expect(launch.args.contains("PubkeyAuthentication=no"))
     #expect(!launch.args.contains("IdentityAgent=none"))

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import SwiftTerm
 import TermTPCore
 
@@ -49,16 +50,22 @@ extension LocalSSHTerminalView {
     ) -> LaunchConfiguration {
         guard needsAskPassScript(for: credential) else {
             return LaunchConfiguration(
-                executable: "/usr/bin/ssh",
-                args: sshArguments(for: connection, promptsForUnknownHostKey: true),
+                executable: "/bin/launchctl",
+                args: launchctlArguments(
+                    wrapping: "/usr/bin/ssh",
+                    arguments: sshArguments(for: connection, promptsForUnknownHostKey: true)
+                ),
                 environment: terminalEnvironment(additionalValues: [:])
             )
         }
 
         let askPass = askPass ?? makeAskPassBundle(password: password(from: credential) ?? "")
         return LaunchConfiguration(
-            executable: "/usr/bin/ssh",
-            args: sshArguments(for: connection, promptsForUnknownHostKey: false),
+            executable: "/bin/launchctl",
+            args: launchctlArguments(
+                wrapping: "/usr/bin/ssh",
+                arguments: sshArguments(for: connection, promptsForUnknownHostKey: false)
+            ),
             environment: terminalEnvironment(additionalValues: [
                 "TERMTP_SSH_PASSWORD_FILE": askPass.passwordFilePath,
                 "SSH_ASKPASS": askPass.scriptPath,
@@ -157,10 +164,6 @@ extension LocalSSHTerminalView {
             "\(connection.username)@\(connection.host)"
         ]
 
-        if connection.jumpHost == nil {
-            args.insert(contentsOf: ["-o", "ProxyCommand=/usr/bin/nc -O %h %p"], at: args.count - 3)
-        }
-
         if promptsForUnknownHostKey {
             if let index = args.firstIndex(of: "StrictHostKeyChecking=accept-new") {
                 args[index] = "StrictHostKeyChecking=ask"
@@ -197,6 +200,13 @@ extension LocalSSHTerminalView {
         }
 
         return args
+    }
+
+    private static func launchctlArguments(
+        wrapping executable: String,
+        arguments: [String]
+    ) -> [String] {
+        ["asuser", String(getuid()), executable] + arguments
     }
 
     static func openSSHOptionValue(_ value: String) -> String {
