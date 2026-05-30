@@ -256,7 +256,7 @@ extension AppState {
             attachLocalSSHProcess(to: tab.id, connection: connection, credential: credential)
             updateRemoteFiles([], path: remotePath, tabID: tab.id)
             if shouldAutoConnectSFTPAfterLocalSSH(connection, credential: credential) {
-                await connectSFTPForSelectedTab()
+                await connectSFTPForSelectedTab(notifiesOnFailure: false)
             }
             return
         }
@@ -329,7 +329,7 @@ extension AppState {
                 attachSession(LocalSSHOnlySession(record: connection), to: tab.id)
                 attachLocalSSHProcess(to: tab.id, connection: connection, credential: credential)
                 updateRemoteFiles([], path: remotePath, tabID: tab.id)
-                await connectSFTPForSelectedTab()
+                await connectSFTPForSelectedTab(notifiesOnFailure: false)
                 return
             }
 

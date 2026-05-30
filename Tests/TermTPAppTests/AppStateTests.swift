@@ -575,7 +575,7 @@ import TermTPCore
     let savedCredential = try? await credentialStore.load(for: connection.id)
     #expect(savedCredential == nil)
     #expect(state.pendingSFTPCredentialPrompt?.connection.id == connection.id)
-    #expect(state.notification?.message == "认证失败，请重新输入密码")
+    #expect(state.notification == nil)
 }
 
 @MainActor
@@ -799,7 +799,7 @@ import TermTPCore
     let savedCredential = try? await credentialStore.load(for: state.connections[0].id)
     #expect(savedCredential == .password("secret"))
     #expect(state.remoteFiles.isEmpty)
-    #expect(state.notification?.message.contains("刷新远程文件失败") == true)
+    #expect(state.notification == nil)
 }
 
 @MainActor

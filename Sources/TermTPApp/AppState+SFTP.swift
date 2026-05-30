@@ -38,7 +38,7 @@ extension AppState {
         }
     }
 
-    func connectSFTPForSelectedTab() async {
+    func connectSFTPForSelectedTab(notifiesOnFailure: Bool = true) async {
         saveRemotePathForSelectedTab()
 
         guard
@@ -77,11 +77,15 @@ extension AppState {
             if isSSHAuthenticationFailure(error) {
                 try? await credentialStore.delete(for: connection.id)
                 requestSFTPCredential(tabID: selectedTabID, connection: connection, path: remotePath)
-                showNotification(kind: .warning, message: t.authenticationFailedRetryPassword)
+                if notifiesOnFailure {
+                    showNotification(kind: .warning, message: t.authenticationFailedRetryPassword)
+                }
                 return
             }
 
-            showNotification(kind: .error, message: t.sftpRefreshFailed(String(describing: error)))
+            if notifiesOnFailure {
+                showNotification(kind: .error, message: t.sftpRefreshFailed(String(describing: error)))
+            }
         }
     }
 
