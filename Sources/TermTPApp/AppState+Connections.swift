@@ -225,6 +225,7 @@ extension AppState {
         credential: Credential?,
         persistsNewConnection: Bool = false
     ) async {
+        requestLocalNetworkPermission()
         var connection = connection
         let tab = TerminalTab(
             title: connection.alias,
@@ -246,9 +247,9 @@ extension AppState {
             }
             updateTab(
                 id: tab.id,
-                state: .connected,
+                state: .connecting,
                 transcript: """
-                \(t.connectedTo) \(connection.username)@\(connection.host):\(connection.port)
+                \(t.connectingTo) \(connection.username)@\(connection.host):\(connection.port)...
 
                 """
             )
@@ -284,7 +285,6 @@ extension AppState {
                 """
             )
             attachSession(session, to: tab.id)
-            attachLocalSSHProcess(to: tab.id, connection: connection, credential: credential)
             await refreshRemoteFiles()
         } catch {
             if connection.authentication.kind == .password, credential != nil, isSSHAuthenticationFailure(error) {
@@ -296,14 +296,14 @@ extension AppState {
                 }
                 updateTab(
                     id: tab.id,
-                    state: .connected,
+                    state: .connecting,
                     transcript: """
-                    \(t.connectedTo) \(connection.username)@\(connection.host):\(connection.port)
+                    \(t.connectingTo) \(connection.username)@\(connection.host):\(connection.port)...
 
                     """
                 )
                 attachSession(LocalSSHOnlySession(record: connection), to: tab.id)
-                attachLocalSSHProcess(to: tab.id, connection: connection, credential: nil)
+                attachLocalSSHProcess(to: tab.id, connection: connection, credential: Optional<Credential>.none)
                 updateRemoteFiles([], path: remotePath, tabID: tab.id)
                 showNotification(kind: .warning, message: t.savedPasswordAuthenticationFailed)
                 return
@@ -320,9 +320,9 @@ extension AppState {
                 }
                 updateTab(
                     id: tab.id,
-                    state: .connected,
+                    state: .connecting,
                     transcript: """
-                    \(t.connectedTo) \(connection.username)@\(connection.host):\(connection.port)
+                    \(t.connectingTo) \(connection.username)@\(connection.host):\(connection.port)...
 
                     """
                 )

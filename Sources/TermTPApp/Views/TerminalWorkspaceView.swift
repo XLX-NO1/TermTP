@@ -12,6 +12,9 @@ struct TerminalWorkspaceView: View {
     var onRenameTab: (TerminalTab.ID, String) -> Void = { _, _ in }
     var onCommandHandled: (TerminalTab.ID, TerminalCommand.ID) -> Void = { _, _ in }
     var onTerminalInput: (String) -> Void = { _ in }
+    var onLocalSSHProcessStarted: @Sendable (LocalSSHProcessStarted) -> Void = { _ in }
+    var onLocalSSHProcessExit: @Sendable (LocalSSHProcessExit) -> Void = { _ in }
+    var hostKeyTrustStore: (any HostKeyTrusting)?
     var strings = AppStrings(language: .zhHans)
     @State private var tabRenameTarget: TabRenameTarget?
     @State private var tabRenameTitle = ""
@@ -73,13 +76,39 @@ struct TerminalWorkspaceView: View {
 
     @ViewBuilder
     private func terminalContent(for tab: TerminalTab) -> some View {
-        if case .ssh(let connection, let credential) = tab.localProcess {
-            LocalSSHTerminalView(connection: connection, credential: credential, fontSize: terminalFontSize)
-                .themed(terminalPalette)
-                .localized(strings)
-                .pendingCommand(pendingCommands[tab.id]) { commandID in
-                    onCommandHandled(tab.id, commandID)
-                }
+        if case .ssh(let connection, let credential, let runID, let backend) = tab.localProcess {
+            let sessionIdentity = SSHTerminalSessionIdentity(connectionID: connection.id, runID: runID)
+            if #available(macOS 15.0, *),
+               backend == .automatic,
+               let hostKeyTrustStore,
+               Self.canUseEmbeddedSSH(connection: connection, credential: credential) {
+                EmbeddedSSHTerminalView(
+                    tabID: tab.id,
+                    runID: runID,
+                    connection: connection,
+                    credential: credential,
+                    hostKeyTrustStore: hostKeyTrustStore,
+                    fontSize: terminalFontSize
+                )
+                    .themed(terminalPalette)
+                    .localized(strings)
+                    .pendingCommand(pendingCommands[tab.id]) { commandID in
+                        onCommandHandled(tab.id, commandID)
+                    }
+                    .processStarted(onLocalSSHProcessStarted)
+                    .processExit(onLocalSSHProcessExit)
+                    .id(sessionIdentity)
+            } else {
+                LocalSSHTerminalView(tabID: tab.id, runID: runID, connection: connection, credential: credential, fontSize: terminalFontSize)
+                    .themed(terminalPalette)
+                    .localized(strings)
+                    .pendingCommand(pendingCommands[tab.id]) { commandID in
+                        onCommandHandled(tab.id, commandID)
+                    }
+                    .processStarted(onLocalSSHProcessStarted)
+                    .processExit(onLocalSSHProcessExit)
+                    .id(sessionIdentity)
+            }
         } else {
             TerminalView(
                 transcript: tab.transcript,
@@ -87,6 +116,30 @@ struct TerminalWorkspaceView: View {
                 palette: terminalPalette,
                 onInput: onTerminalInput
             )
+        }
+    }
+
+    static func canUseEmbeddedSSH(connection: ConnectionRecord, credential: Credential?) -> Bool {
+        let jumpHost = connection.jumpHost?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard
+            jumpHost.isEmpty,
+            connection.portForwards.isEmpty,
+            !connection.keepAlive.isEnabled
+        else {
+            return false
+        }
+
+        switch connection.authentication {
+        case .password:
+            guard case .password(let password) = credential else {
+                return false
+            }
+            return !password.isEmpty
+        case .publicKey:
+            guard case .privateKeyPassphrase(let passphrase) = credential else {
+                return false
+            }
+            return !passphrase.isEmpty
         }
     }
 
@@ -183,6 +236,8 @@ struct TerminalWorkspaceView: View {
         switch state {
         case .connecting:
             return .yellow
+        case .localProcessRunning:
+            return .mint
         case .connected:
             return .green
         case .disconnected:

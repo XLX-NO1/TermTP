@@ -23,18 +23,38 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
     }
 
     private let fileURL: URL
+    private let knownHostsFileURL: URL
     private var trustedKeys: [String: String]
     private var pendingRequests: [PendingHostKeyRequest] = []
     var pendingPrompt: HostKeyPrompt?
     var onPromptChanged: ((HostKeyPrompt?) -> Void)?
 
-    init(fileURL: URL = AppHostKeyTrustStore.defaultFileURL) {
+    init(
+        fileURL: URL = AppHostKeyTrustStore.defaultFileURL,
+        knownHostsFileURL: URL = TermTPKnownHostsFile.defaultFileURL
+    ) {
         self.fileURL = fileURL
+        self.knownHostsFileURL = knownHostsFileURL
         self.trustedKeys = (try? Self.loadTrustedKeys(from: fileURL)) ?? [:]
     }
 
     func trustedKey(host: String, port: UInt16) async -> String? {
-        trustedKeys[key(for: host, port: port)]
+        let hostPort = key(for: host, port: port)
+        if let trustedKey = trustedKeys[hostPort] {
+            return trustedKey
+        }
+
+        guard let knownHostsKey = try? TermTPKnownHostsFile.trustedKey(
+            host: host,
+            port: port,
+            from: knownHostsFileURL
+        ) else {
+            return nil
+        }
+
+        trustedKeys[hostPort] = knownHostsKey
+        try? Self.persistTrustedKeys(trustedKeys, to: fileURL)
+        return knownHostsKey
     }
 
     func saveTrustedKey(_ key: String, host: String, port: UInt16) async throws {
@@ -46,6 +66,24 @@ final class AppHostKeyTrustStore: HostKeyTrusting, @unchecked Sendable {
         trustedKeys
             .map { TrustedHostKey(hostPort: $0.key, key: $0.value) }
             .sorted { $0.hostPort < $1.hostPort }
+    }
+
+    @discardableResult
+    func importKnownHosts() -> Bool {
+        guard let knownHostKeys = try? TermTPKnownHostsFile.trustedKeys(from: knownHostsFileURL) else {
+            return false
+        }
+
+        var didImport = false
+        for (hostPort, key) in knownHostKeys where trustedKeys[hostPort] != key {
+            trustedKeys[hostPort] = key
+            didImport = true
+        }
+
+        if didImport {
+            try? Self.persistTrustedKeys(trustedKeys, to: fileURL)
+        }
+        return didImport
     }
 
     func removeTrustedKey(hostPort: String) {

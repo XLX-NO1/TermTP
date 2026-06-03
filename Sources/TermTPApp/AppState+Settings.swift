@@ -4,6 +4,7 @@ import TermTPCore
 extension AppState {
     var trustedHostKeys: [AppHostKeyTrustStore.TrustedHostKey] {
         _ = trustedHostKeyRevision
+        importKnownHostsIfNeeded()
         return hostKeyTrustStore.trustedHostKeys
     }
 
@@ -40,6 +41,7 @@ extension AppState {
     }
 
     func showSettings() {
+        importKnownHostsIfNeeded()
         isSettingsPresented = true
     }
 
@@ -61,5 +63,12 @@ extension AppState {
 
     func decreaseTerminalFontSize() {
         terminalFontSize = max(TerminalFont.sizeOptions.first ?? terminalFontSize, terminalFontSize - 1)
+    }
+
+    private func importKnownHostsIfNeeded() {
+        guard hostKeyTrustStore.importKnownHosts() else {
+            return
+        }
+        trustedHostKeyRevision += 1
     }
 }

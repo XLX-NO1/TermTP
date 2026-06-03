@@ -10,6 +10,85 @@ import TermTPCore
     #expect(state.credentialStore is KeychainCredentialStore)
 }
 
+private func expectLocalSSHProcess(
+    _ process: TerminalLocalProcess?,
+    connectionID: ConnectionRecord.ID,
+    credential expectedCredential: Credential?,
+    backend expectedBackend: TerminalSSHProcessBackend = .automatic
+) -> UUID? {
+    guard case .ssh(let connection, let credential, let runID, let backend) = process else {
+        Issue.record("Expected local SSH terminal")
+        return nil
+    }
+
+    #expect(connection.id == connectionID)
+    #expect(credential == expectedCredential)
+    #expect(backend == expectedBackend)
+    return runID
+}
+
+@MainActor
+@Test func embeddedSSHOnlyHandlesDirectConnectionsWithUsableCredentials() {
+    let passwordConnection = ConnectionRecord.samplePassword
+    #expect(TerminalWorkspaceView.canUseEmbeddedSSH(
+        connection: passwordConnection,
+        credential: .password("secret")
+    ))
+    #expect(!TerminalWorkspaceView.canUseEmbeddedSSH(
+        connection: passwordConnection,
+        credential: nil
+    ))
+
+    var jumpConnection = passwordConnection
+    jumpConnection.jumpHost = "jump.example.com"
+    #expect(!TerminalWorkspaceView.canUseEmbeddedSSH(
+        connection: jumpConnection,
+        credential: .password("secret")
+    ))
+
+    var forwardedConnection = passwordConnection
+    forwardedConnection.portForwards = [
+        .init(direction: .local, localPort: 8080, destinationHost: "localhost", destinationPort: 80)
+    ]
+    #expect(!TerminalWorkspaceView.canUseEmbeddedSSH(
+        connection: forwardedConnection,
+        credential: .password("secret")
+    ))
+
+    let keyConnection = ConnectionRecord(
+        alias: "Key",
+        host: "example.com",
+        username: "deploy",
+        authentication: .publicKey(privateKeyPath: "/tmp/key")
+    )
+    #expect(!TerminalWorkspaceView.canUseEmbeddedSSH(
+        connection: keyConnection,
+        credential: nil
+    ))
+    #expect(TerminalWorkspaceView.canUseEmbeddedSSH(
+        connection: keyConnection,
+        credential: .privateKeyPassphrase("secret")
+    ))
+
+    var keepAliveConnection = passwordConnection
+    keepAliveConnection.keepAlive = .init(isEnabled: true)
+    #expect(!TerminalWorkspaceView.canUseEmbeddedSSH(
+        connection: keepAliveConnection,
+        credential: .password("secret")
+    ))
+}
+
+@Test func sshTerminalSessionIdentityChangesWhenRunIDChanges() {
+    let connectionID = UUID()
+    let firstRunID = UUID()
+    let secondRunID = UUID()
+
+    #expect(SSHTerminalSessionIdentity(connectionID: connectionID, runID: firstRunID)
+        == SSHTerminalSessionIdentity(connectionID: connectionID, runID: firstRunID))
+    #expect(SSHTerminalSessionIdentity(connectionID: connectionID, runID: firstRunID)
+        != SSHTerminalSessionIdentity(connectionID: connectionID, runID: secondRunID))
+}
+
 @MainActor
 @Test func migrateLegacyFileCredentialsCopiesSecretsAndRemovesPlaintextStore() async throws {
     let directory = FileManager.default.temporaryDirectory
@@ -463,7 +542,7 @@ import TermTPCore
 }
 
 @MainActor
-@Test func connectDraftConnectionCreatesConnectedTabAndLoadsRemoteFiles() async {
+@Test func connectDraftPasswordConnectionStartsLocalSSHTabAndLoadsRemoteFiles() async {
     let sftpService = RecordingSFTPService(filesByPath: [
         "/var/www": [RemoteFile(name: "readme.txt", path: "/var/www/readme.txt", kind: .file, size: 12)]
     ])
@@ -480,9 +559,13 @@ import TermTPCore
     #expect(state.connections.count == 1)
     #expect(state.tabs.count == 2)
     #expect(state.tabs.last?.title == "Prod")
-    #expect(state.tabs.last?.state == .connected)
-    #expect(state.tabs.last?.transcript.contains("Connected to deploy@example.com:22") == true)
-    #expect(state.tabs.last?.localProcess == .ssh(state.connections[0], credential: .password("secret")))
+    #expect(state.tabs.last?.state == .connecting)
+    #expect(state.tabs.last?.transcript.contains("Connecting to deploy@example.com:22") == true)
+    _ = expectLocalSSHProcess(
+        state.tabs.last?.localProcess,
+        connectionID: state.connections[0].id,
+        credential: .password("secret")
+    )
     #expect(state.selectedTabID == state.tabs.last?.id)
     #expect(state.connections[0].defaultRemotePath == "/var/www")
     #expect(state.remotePath == "/var/www")
@@ -511,8 +594,12 @@ import TermTPCore
 
     let connection = state.connections[0]
 
-    #expect(state.tabs.last?.state == .connected)
-    #expect(state.tabs.last?.localProcess == .ssh(connection, credential: nil))
+    #expect(state.tabs.last?.state == .connecting)
+    _ = expectLocalSSHProcess(
+        state.tabs.last?.localProcess,
+        connectionID: connection.id,
+        credential: nil
+    )
     let savedCredential = try? await credentialStore.load(for: connection.id)
     #expect(savedCredential == nil)
     #expect(state.remotePath == "/srv")
@@ -539,8 +626,12 @@ import TermTPCore
 
     let connection = state.connections[0]
 
-    #expect(state.tabs.last?.state == .connected)
-    #expect(state.tabs.last?.localProcess == .ssh(connection, credential: .password("secret")))
+    #expect(state.tabs.last?.state == .connecting)
+    _ = expectLocalSSHProcess(
+        state.tabs.last?.localProcess,
+        connectionID: connection.id,
+        credential: .password("secret")
+    )
     #expect(state.remoteFiles.isEmpty)
 }
 
@@ -565,13 +656,12 @@ import TermTPCore
 
     await state.connect(connection)
 
-    #expect(state.tabs.last?.state == .connected)
-    if case .ssh(let fallbackConnection, let credential) = state.tabs.last?.localProcess {
-        #expect(fallbackConnection.id == connection.id)
-        #expect(credential == .password("stale"))
-    } else {
-        Issue.record("Expected local SSH terminal")
-    }
+    #expect(state.tabs.last?.state == .connecting)
+    _ = expectLocalSSHProcess(
+        state.tabs.last?.localProcess,
+        connectionID: connection.id,
+        credential: .password("stale")
+    )
     let savedCredential = try? await credentialStore.load(for: connection.id)
     #expect(savedCredential == nil)
     #expect(state.pendingSFTPCredentialPrompt?.connection.id == connection.id)
@@ -598,13 +688,12 @@ import TermTPCore
 
     await state.connect(connection)
 
-    #expect(state.tabs.last?.state == .connected)
-    if case .ssh(let fallbackConnection, let credential) = state.tabs.last?.localProcess {
-        #expect(fallbackConnection.id == connection.id)
-        #expect(credential == .password("secret"))
-    } else {
-        Issue.record("Expected local SSH fallback with saved password")
-    }
+    #expect(state.tabs.last?.state == .connecting)
+    _ = expectLocalSSHProcess(
+        state.tabs.last?.localProcess,
+        connectionID: connection.id,
+        credential: .password("secret")
+    )
     #expect(state.remoteFiles.isEmpty)
 }
 
@@ -632,7 +721,7 @@ import TermTPCore
 
     await state.connect(connection)
 
-    #expect(state.tabs.last?.state == .connected)
+    #expect(state.tabs.last?.state == .connecting)
     #expect(await sshClient.credentials == [.password("secret")])
     #expect(state.pendingSFTPCredentialPrompt == nil)
     #expect(state.remoteFiles == [RemoteFile(name: "deploy.sh", path: "/root/deploy.sh", kind: .file, size: 8)])
@@ -668,12 +757,95 @@ import TermTPCore
 
     """.write(to: knownHostsURL, atomically: true, encoding: .utf8)
 
-    let store = AppHostKeyTrustStore(fileURL: trustedKeysURL)
+    let store = AppHostKeyTrustStore(
+        fileURL: trustedKeysURL,
+        knownHostsFileURL: directory.appendingPathComponent("missing-termtp-known-hosts")
+    )
 
     #expect(store.trustedHostKeys.isEmpty)
     #expect(await store.trustedKey(host: "192.168.3.55", port: 22) == nil)
     #expect(await store.trustedKey(host: "example.com", port: 2222) == nil)
     #expect(!FileManager.default.fileExists(atPath: trustedKeysURL.path))
+}
+
+@MainActor
+@Test func hostKeyTrustStoreImportsTermTPKnownHostsEntry() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let trustedKeysURL = directory.appendingPathComponent("trusted-host-keys.json")
+    let knownHostsURL = directory.appendingPathComponent("known_hosts")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try """
+    # TermTP local SSH trust
+    192.168.3.113 ssh-ed25519 AAAALAN
+    other.example.com ssh-rsa AAAAOTHER
+
+    """.write(to: knownHostsURL, atomically: true, encoding: .utf8)
+
+    let store = AppHostKeyTrustStore(fileURL: trustedKeysURL, knownHostsFileURL: knownHostsURL)
+
+    #expect(await store.trustedKey(host: "192.168.3.113", port: 22) == "ssh-ed25519 AAAALAN")
+    #expect(store.trustedHostKeys == [
+        .init(hostPort: "192.168.3.113:22", key: "ssh-ed25519 AAAALAN")
+    ])
+
+    let persisted = try JSONDecoder.termtp.decode(
+        [String: String].self,
+        from: Data(contentsOf: trustedKeysURL)
+    )
+    #expect(persisted["192.168.3.113:22"] == "ssh-ed25519 AAAALAN")
+}
+
+@MainActor
+@Test func hostKeyTrustStoreImportsAllTermTPKnownHostsForSettings() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let trustedKeysURL = directory.appendingPathComponent("trusted-host-keys.json")
+    let knownHostsURL = directory.appendingPathComponent("known_hosts")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try """
+    # TermTP local SSH trust
+    192.168.3.113 ssh-ed25519 AAAALAN
+    [example.com]:2222 ssh-rsa AAAAPORT
+    |1|hashed|host ssh-ed25519 AAAAHASHED
+
+    """.write(to: knownHostsURL, atomically: true, encoding: .utf8)
+
+    let store = AppHostKeyTrustStore(fileURL: trustedKeysURL, knownHostsFileURL: knownHostsURL)
+
+    #expect(store.importKnownHosts())
+    #expect(store.trustedHostKeys == [
+        .init(hostPort: "192.168.3.113:22", key: "ssh-ed25519 AAAALAN"),
+        .init(hostPort: "example.com:2222", key: "ssh-rsa AAAAPORT")
+    ])
+
+    let persisted = try JSONDecoder.termtp.decode(
+        [String: String].self,
+        from: Data(contentsOf: trustedKeysURL)
+    )
+    #expect(persisted["192.168.3.113:22"] == "ssh-ed25519 AAAALAN")
+    #expect(persisted["example.com:2222"] == "ssh-rsa AAAAPORT")
+    #expect(persisted["hashed:22"] == nil)
+}
+
+@MainActor
+@Test func hostKeyTrustStoreImportsTermTPKnownHostsPortEntry() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let trustedKeysURL = directory.appendingPathComponent("trusted-host-keys.json")
+    let knownHostsURL = directory.appendingPathComponent("known_hosts")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try """
+    example.com ssh-ed25519 AAAADEFAULT
+    [example.com]:2222 ssh-rsa AAAAPORT
+    |1|hashed|host ssh-ed25519 AAAAHASHED
+
+    """.write(to: knownHostsURL, atomically: true, encoding: .utf8)
+
+    let store = AppHostKeyTrustStore(fileURL: trustedKeysURL, knownHostsFileURL: knownHostsURL)
+
+    #expect(await store.trustedKey(host: "example.com", port: 2222) == "ssh-rsa AAAAPORT")
+    #expect(await store.trustedKey(host: "hashed", port: 22) == nil)
 }
 
 @MainActor
@@ -769,7 +941,7 @@ import TermTPCore
     await sshClient.finish()
     await connectTask.value
 
-    #expect(state.tabs.last?.state == .connected)
+    #expect(state.tabs.last?.state == .connecting)
     #expect(state.connections.first?.host == "192.168.1.20")
 }
 
@@ -791,8 +963,12 @@ import TermTPCore
     await state.connectDraftConnection()
 
     #expect(state.connections.count == 1)
-    #expect(state.tabs.last?.state == .connected)
-    #expect(state.tabs.last?.localProcess == .ssh(state.connections[0], credential: .password("secret")))
+    #expect(state.tabs.last?.state == .connecting)
+    _ = expectLocalSSHProcess(
+        state.tabs.last?.localProcess,
+        connectionID: state.connections[0].id,
+        credential: .password("secret")
+    )
     let savedCredential = try? await credentialStore.load(for: state.connections[0].id)
     #expect(savedCredential == .password("secret"))
     #expect(state.remoteFiles.isEmpty)
@@ -953,6 +1129,244 @@ import TermTPCore
     #expect(state.remoteFiles == [
         RemoteFile(name: "data.json", path: "/var/www/cache/data.json", kind: .file, size: 1)
     ])
+}
+
+@MainActor
+@Test func localSSHProcessNonzeroExitMarksTabFailed() {
+    let connection = ConnectionRecord.samplePassword
+    let runID = UUID()
+    let tab = TerminalTab(
+        title: "LAN",
+        state: .connecting,
+        transcript: "Connecting...\n",
+        localProcess: .ssh(connection, credential: .password("secret"), runID: runID)
+    )
+    let state = AppState(tabs: [tab], connections: [connection], localSSHDebugLogWriter: { _ in })
+
+    state.handleLocalSSHProcessExit(LocalSSHProcessExit(
+        tabID: tab.id,
+        runID: runID,
+        connection: connection,
+        exitCode: 255,
+        launch: LocalSSHLaunchSnapshot(
+            executable: "/usr/bin/ssh",
+            args: ["deploy@example.com"],
+            environment: nil,
+            debugCommand: "/usr/bin/ssh deploy@example.com"
+        )
+    ))
+
+    #expect(state.tabs[0].state == .failed("ssh exited with code 255"))
+    #expect(state.tabs[0].localProcess == nil)
+    #expect(state.tabs[0].transcript.contains("ssh exited with code 255"))
+}
+
+@MainActor
+@Test func localSSHProcessNormalizesWaitStatusExitCode() {
+    let connection = ConnectionRecord.samplePassword
+    let runID = UUID()
+    let tab = TerminalTab(
+        title: "LAN",
+        state: .connecting,
+        transcript: "Connecting...\n",
+        localProcess: .ssh(connection, credential: .password("secret"), runID: runID)
+    )
+    let state = AppState(tabs: [tab], connections: [connection], localSSHDebugLogWriter: { _ in })
+
+    state.handleLocalSSHProcessExit(LocalSSHProcessExit(
+        tabID: tab.id,
+        runID: runID,
+        connection: connection,
+        exitCode: 65280,
+        launch: LocalSSHLaunchSnapshot(
+            executable: "/usr/bin/ssh",
+            args: ["deploy@example.com"],
+            environment: nil,
+            debugCommand: "/usr/bin/ssh deploy@example.com"
+        )
+    ))
+
+    #expect(state.tabs[0].state == .failed("ssh exited with code 255"))
+    #expect(state.tabs[0].transcript.contains("ssh exited with code 255"))
+    #expect(!state.tabs[0].transcript.contains("ssh exited with code 65280"))
+}
+
+@MainActor
+@Test func embeddedSSHFailureFallsBackToIsolatedOpenSSH() {
+    let connection = ConnectionRecord.samplePassword
+    let runID = UUID()
+    let tab = TerminalTab(
+        title: "LAN",
+        state: .connecting,
+        transcript: "Connecting...\n",
+        localProcess: .ssh(
+            connection,
+            credential: .password("secret"),
+            runID: runID,
+            backend: .automatic
+        )
+    )
+    let state = AppState(tabs: [tab], connections: [connection], localSSHDebugLogWriter: { _ in })
+
+    state.handleLocalSSHProcessExit(LocalSSHProcessExit(
+        tabID: tab.id,
+        runID: runID,
+        connection: connection,
+        exitCode: 255,
+        launch: LocalSSHLaunchSnapshot(
+            executable: "embedded-citadel",
+            args: ["me@localhost", "-p", "22"],
+            environment: nil,
+            debugCommand: "embedded-citadel me@localhost:22"
+        )
+    ))
+
+    #expect(state.tabs[0].state == .connecting)
+    #expect(state.tabs[0].transcript.contains("falling back to isolated OpenSSH"))
+    _ = expectLocalSSHProcess(
+        state.tabs[0].localProcess,
+        connectionID: connection.id,
+        credential: .password("secret"),
+        backend: .openSSHOnly
+    )
+}
+
+@MainActor
+@Test func localSSHProcessZeroExitMarksTabDisconnected() {
+    let connection = ConnectionRecord.samplePassword
+    let runID = UUID()
+    let tab = TerminalTab(
+        title: "LAN",
+        state: .connecting,
+        transcript: "Connecting...\n",
+        localProcess: .ssh(connection, credential: .password("secret"), runID: runID)
+    )
+    let state = AppState(tabs: [tab], connections: [connection], localSSHDebugLogWriter: { _ in })
+
+    state.handleLocalSSHProcessExit(LocalSSHProcessExit(
+        tabID: tab.id,
+        runID: runID,
+        connection: connection,
+        exitCode: 0,
+        launch: LocalSSHLaunchSnapshot(
+            executable: "/usr/bin/ssh",
+            args: ["deploy@example.com"],
+            environment: nil,
+            debugCommand: "/usr/bin/ssh deploy@example.com"
+        )
+    ))
+
+    #expect(state.tabs[0].state == .disconnected)
+    #expect(state.tabs[0].localProcess == nil)
+    #expect(!state.tabs[0].transcript.contains("Failed to connect"))
+    #expect(state.tabs[0].transcript.contains("ssh exited with code 0"))
+}
+
+@MainActor
+@Test func localSSHProcessStartedMarksTabRunningAfterGracePeriod() async {
+    let connection = ConnectionRecord.samplePassword
+    let runID = UUID()
+    let tab = TerminalTab(
+        title: "LAN",
+        state: .connecting,
+        transcript: "Connecting...\n",
+        localProcess: .ssh(connection, credential: .password("secret"), runID: runID)
+    )
+    let state = AppState(tabs: [tab], connections: [connection], localSSHDebugLogWriter: { _ in })
+
+    state.handleLocalSSHProcessStarted(LocalSSHProcessStarted(tabID: tab.id, runID: runID, connection: connection))
+    try? await Task.sleep(for: .milliseconds(850))
+
+    #expect(state.tabs[0].state == .localProcessRunning)
+}
+
+@MainActor
+@Test func staleLocalSSHProcessStartedDoesNotMarkCurrentTabRunning() async {
+    let connection = ConnectionRecord.samplePassword
+    let currentRunID = UUID()
+    let staleRunID = UUID()
+    let tab = TerminalTab(
+        title: "LAN",
+        state: .connecting,
+        transcript: "Connecting...\n",
+        localProcess: .ssh(connection, credential: .password("secret"), runID: currentRunID)
+    )
+    let state = AppState(tabs: [tab], connections: [connection], localSSHDebugLogWriter: { _ in })
+
+    state.handleLocalSSHProcessStarted(LocalSSHProcessStarted(tabID: tab.id, runID: staleRunID, connection: connection))
+    try? await Task.sleep(for: .milliseconds(850))
+
+    #expect(state.tabs[0].state == .connecting)
+}
+
+@MainActor
+@Test func staleLocalSSHProcessExitDoesNotClearCurrentTabProcess() {
+    let connection = ConnectionRecord.samplePassword
+    let currentRunID = UUID()
+    let staleRunID = UUID()
+    let tab = TerminalTab(
+        title: "LAN",
+        state: .connecting,
+        transcript: "Connecting...\n",
+        localProcess: .ssh(connection, credential: .password("secret"), runID: currentRunID)
+    )
+    let state = AppState(tabs: [tab], connections: [connection], localSSHDebugLogWriter: { _ in })
+
+    state.handleLocalSSHProcessExit(LocalSSHProcessExit(
+        tabID: tab.id,
+        runID: staleRunID,
+        connection: connection,
+        exitCode: 255,
+        launch: LocalSSHLaunchSnapshot(
+            executable: "/usr/bin/ssh",
+            args: ["deploy@example.com"],
+            environment: nil,
+            debugCommand: "/usr/bin/ssh deploy@example.com"
+        )
+    ))
+
+    #expect(state.tabs[0].state == .connecting)
+    _ = expectLocalSSHProcess(
+        state.tabs[0].localProcess,
+        connectionID: connection.id,
+        credential: .password("secret")
+    )
+}
+
+@MainActor
+@Test func localSSHProcessStartedDoesNotOverwriteEarlyExitFailure() async {
+    let connection = ConnectionRecord.samplePassword
+    let runID = UUID()
+    let tab = TerminalTab(
+        title: "LAN",
+        state: .connecting,
+        transcript: "Connecting...\n",
+        localProcess: .ssh(connection, credential: .password("secret"), runID: runID)
+    )
+    let state = AppState(tabs: [tab], connections: [connection], localSSHDebugLogWriter: { _ in })
+
+    state.handleLocalSSHProcessStarted(LocalSSHProcessStarted(tabID: tab.id, runID: runID, connection: connection))
+    state.handleLocalSSHProcessExit(LocalSSHProcessExit(
+        tabID: tab.id,
+        runID: runID,
+        connection: connection,
+        exitCode: 255,
+        launch: LocalSSHLaunchSnapshot(
+            executable: "/usr/bin/ssh",
+            args: ["deploy@example.com"],
+            environment: nil,
+            debugCommand: "/usr/bin/ssh deploy@example.com"
+        )
+    ))
+    try? await Task.sleep(for: .milliseconds(850))
+
+    #expect(state.tabs[0].state == .failed("ssh exited with code 255"))
+}
+
+@Test func localSSHOnlySessionReportsLocalProcessRunningState() async {
+    let session = LocalSSHOnlySession(record: .samplePassword)
+
+    #expect(await session.state == .localProcessRunning)
 }
 
 @MainActor

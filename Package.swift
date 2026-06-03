@@ -30,7 +30,10 @@ let package = Package(
             name: "TermTPApp",
             dependencies: [
                 "TermTPCore",
-                .product(name: "SwiftTerm", package: "SwiftTerm")
+                .product(name: "SwiftTerm", package: "SwiftTerm"),
+                .product(name: "Citadel", package: "Citadel"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOSSH", package: "swift-nio-ssh")
             ],
             resources: [.process("Resources")]
         ),

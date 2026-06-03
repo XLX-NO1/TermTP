@@ -35,7 +35,7 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
     <key>CFBundleExecutable</key>
     <string>TermTP</string>
     <key>CFBundleIdentifier</key>
-    <string>local.termtp.app</string>
+    <string>local.termtp.lan</string>
     <key>CFBundleName</key>
     <string>TermTP</string>
     <key>CFBundleDisplayName</key>
@@ -52,6 +52,11 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
     <string>14.0</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>TermTP 需要访问局域网内的 SSH/SFTP 服务器。</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_ssh._tcp</string>
+        <string>_sftp-ssh._tcp</string>
+    </array>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>
@@ -62,7 +67,7 @@ codesign \
     --force \
     --deep \
     --sign - \
-    --identifier local.termtp.app \
+    --identifier local.termtp.lan \
     --entitlements "$ROOT_DIR/Packaging/TermTP.entitlements" \
     "$APP_DIR"
 

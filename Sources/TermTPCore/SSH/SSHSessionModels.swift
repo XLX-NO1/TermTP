@@ -2,6 +2,7 @@ import Foundation
 
 public enum SSHSessionState: Equatable, Sendable {
     case connecting
+    case localProcessRunning
     case connected
     case disconnected
     case failed(String)

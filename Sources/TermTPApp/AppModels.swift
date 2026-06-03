@@ -76,8 +76,71 @@ struct SFTPCredentialPrompt: Identifiable, Equatable {
     var path: String
 }
 
+enum TerminalSSHProcessBackend: Equatable {
+    case automatic
+    case openSSHOnly
+}
+
 enum TerminalLocalProcess: Equatable {
-    case ssh(ConnectionRecord, credential: Credential?)
+    case ssh(
+        ConnectionRecord,
+        credential: Credential?,
+        runID: UUID? = nil,
+        backend: TerminalSSHProcessBackend = .automatic
+    )
+}
+
+struct LocalSSHProcessExit: Equatable, Sendable {
+    var tabID: TerminalTab.ID
+    var runID: UUID?
+    var connection: ConnectionRecord
+    var exitCode: Int32?
+    var launch: LocalSSHLaunchSnapshot
+
+    init(
+        tabID: TerminalTab.ID,
+        runID: UUID? = nil,
+        connection: ConnectionRecord,
+        exitCode: Int32?,
+        launch: LocalSSHLaunchSnapshot
+    ) {
+        self.tabID = tabID
+        self.runID = runID
+        self.connection = connection
+        self.exitCode = exitCode
+        self.launch = launch
+    }
+
+    var normalizedExitCode: Int32? {
+        guard let exitCode else {
+            return nil
+        }
+
+        if exitCode > 255, exitCode & 0xff == 0 {
+            return (exitCode >> 8) & 0xff
+        }
+
+        return exitCode
+    }
+}
+
+struct LocalSSHProcessStarted: Equatable, Sendable {
+    var tabID: TerminalTab.ID
+    var runID: UUID?
+    var connection: ConnectionRecord
+
+    init(tabID: TerminalTab.ID, runID: UUID? = nil, connection: ConnectionRecord) {
+        self.tabID = tabID
+        self.runID = runID
+        self.connection = connection
+    }
+}
+
+struct LocalSSHLaunchSnapshot: Equatable, Sendable {
+    var executable: String
+    var args: [String]
+    var environment: [String]?
+    var debugCommand: String
 }
 
 extension TerminalTab {

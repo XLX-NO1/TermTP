@@ -1,3 +1,4 @@
+import Foundation
 import TermTPCore
 
 extension AppState {
@@ -74,12 +75,92 @@ extension AppState {
         tabs[index].transcript += transcript
     }
 
-    func attachLocalSSHProcess(to id: TerminalTab.ID, connection: ConnectionRecord, credential: Credential?) {
+    func attachLocalSSHProcess(
+        to id: TerminalTab.ID,
+        connection: ConnectionRecord,
+        credential: Credential?,
+        runID: UUID? = nil,
+        backend: TerminalSSHProcessBackend = .automatic
+    ) {
         guard let index = tabs.firstIndex(where: { $0.id == id }) else {
             return
         }
 
-        tabs[index].localProcess = .ssh(connection, credential: credential)
+        tabs[index].localProcess = .ssh(
+            connection,
+            credential: credential,
+            runID: runID ?? UUID(),
+            backend: backend
+        )
+    }
+
+    func handleLocalSSHProcessStarted(_ started: LocalSSHProcessStarted) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(750))
+            markLocalSSHProcessRunningIfStillActive(started)
+        }
+    }
+
+    private func markLocalSSHProcessRunningIfStillActive(_ started: LocalSSHProcessStarted) {
+        guard let index = tabs.firstIndex(where: { $0.id == started.tabID }) else {
+            return
+        }
+
+        guard case .ssh(let connection, _, let runID, _) = tabs[index].localProcess,
+              connection.id == started.connection.id,
+              runID == started.runID
+        else {
+            return
+        }
+
+        guard tabs[index].state == .connecting else {
+            return
+        }
+
+        tabs[index].state = .localProcessRunning
+    }
+
+    func handleLocalSSHProcessExit(_ exit: LocalSSHProcessExit) {
+        guard let index = tabs.firstIndex(where: { $0.id == exit.tabID }) else {
+            return
+        }
+
+        let normalizedExitCode = exit.normalizedExitCode
+        let localSSHDebugLogWriter = localSSHDebugLogWriter
+        Task.detached(priority: .utility) {
+            localSSHDebugLogWriter(exit)
+        }
+
+        guard case .ssh(let connection, let credential, let runID, let backend) = tabs[index].localProcess,
+              connection.id == exit.connection.id,
+              runID == exit.runID
+        else {
+            return
+        }
+
+        if backend == .automatic,
+           exit.launch.executable == "embedded-citadel",
+           normalizedExitCode != 0 {
+            tabs[index].localProcess = .ssh(
+                connection,
+                credential: credential,
+                runID: UUID(),
+                backend: .openSSHOnly
+            )
+            tabs[index].state = .connecting
+            tabs[index].transcript += "\nTermTP embedded SSH failed; falling back to isolated OpenSSH.\n"
+            return
+        }
+
+        let exitDescription = normalizedExitCode.map { "ssh exited with code \($0)" } ?? "ssh exited"
+        tabs[index].localProcess = nil
+        tabs[index].state = normalizedExitCode == 0 ? .disconnected : .failed(exitDescription)
+        if normalizedExitCode == 0 {
+            tabs[index].transcript += "\n\(exitDescription)\n"
+        } else {
+            let message = t.failedToConnect + " \(exit.connection.username)@\(exit.connection.host):\(exit.connection.port)"
+            tabs[index].transcript += "\n\(message)\n\(exitDescription)\n"
+        }
     }
 
     var selectedSession: SSHSessionProviding? {

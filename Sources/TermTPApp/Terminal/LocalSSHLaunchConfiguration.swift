@@ -30,6 +30,15 @@ extension LocalSSHTerminalView {
 
             return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
         }
+
+        var snapshot: LocalSSHLaunchSnapshot {
+            LocalSSHLaunchSnapshot(
+                executable: executable,
+                args: args,
+                environment: environment,
+                debugCommand: debugCommand
+            )
+        }
     }
 
     static func password(from credential: Credential?) -> String? {
@@ -50,22 +59,16 @@ extension LocalSSHTerminalView {
     ) -> LaunchConfiguration {
         guard needsAskPassScript(for: credential) else {
             return LaunchConfiguration(
-                executable: "/bin/launchctl",
-                args: launchctlArguments(
-                    wrapping: "/usr/bin/ssh",
-                    arguments: sshArguments(for: connection, promptsForUnknownHostKey: true)
-                ),
+                executable: "/usr/bin/ssh",
+                args: sshArguments(for: connection, promptsForUnknownHostKey: true),
                 environment: terminalEnvironment(additionalValues: [:])
             )
         }
 
         let askPass = askPass ?? makeAskPassBundle(password: password(from: credential) ?? "")
         return LaunchConfiguration(
-            executable: "/bin/launchctl",
-            args: launchctlArguments(
-                wrapping: "/usr/bin/ssh",
-                arguments: sshArguments(for: connection, promptsForUnknownHostKey: false)
-            ),
+            executable: "/usr/bin/ssh",
+            args: sshArguments(for: connection, promptsForUnknownHostKey: false),
             environment: terminalEnvironment(additionalValues: [
                 "TERMTP_SSH_PASSWORD_FILE": askPass.passwordFilePath,
                 "SSH_ASKPASS": askPass.scriptPath,
@@ -79,10 +82,28 @@ extension LocalSSHTerminalView {
         TermTPKnownHostsFile.defaultFileURL
     }
 
+    static var isolatedHomeURL: URL {
+        knownHostsFileURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("home", isDirectory: true)
+    }
+
     static func prepareKnownHostsFile() {
+        TermTPKnownHostsFile.migrateLegacyFileIfNeeded()
         let directory = knownHostsFileURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(
             at: directory,
+            withIntermediateDirectories: true
+        )
+        if !FileManager.default.fileExists(atPath: knownHostsFileURL.path) {
+            FileManager.default.createFile(atPath: knownHostsFileURL.path, contents: nil)
+        }
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: knownHostsFileURL.path
+        )
+        try? FileManager.default.createDirectory(
+            at: isolatedHomeURL,
             withIntermediateDirectories: true
         )
     }
@@ -133,13 +154,21 @@ extension LocalSSHTerminalView {
     }
 
     private static func terminalEnvironment(additionalValues: [String: String]) -> [String] {
-        var values: [String: String] = [:]
-        for entry in Terminal.getEnvironmentVariables(termName: "xterm-256color") {
-            guard let separator = entry.firstIndex(of: "=") else {
-                continue
-            }
+        let processEnvironment = ProcessInfo.processInfo.environment
+        var values: [String: String] = [
+            "HOME": isolatedHomeURL.path,
+            "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+            "TERM": "xterm-256color"
+        ]
 
-            values[String(entry[..<separator])] = String(entry[entry.index(after: separator)...])
+        for key in ["LANG", "LC_ALL", "LC_CTYPE"] {
+            if let value = processEnvironment[key], !value.isEmpty {
+                values[key] = value
+            }
+        }
+
+        if values["LANG"] == nil, values["LC_ALL"] == nil, values["LC_CTYPE"] == nil {
+            values["LANG"] = "en_US.UTF-8"
         }
 
         additionalValues.forEach { key, value in
@@ -157,9 +186,24 @@ extension LocalSSHTerminalView {
     ) -> [String] {
         var args = [
             "-F", "/dev/null",
+            "-o", "IgnoreUnknown=UseKeychain",
             "-o", "StrictHostKeyChecking=accept-new",
             "-o", "GlobalKnownHostsFile=/dev/null",
-            "-o", "UserKnownHostsFile=\(openSSHOptionValue(knownHostsFileURL.path))",
+            "-o", "UserKnownHostsFile=\(knownHostsFileURL.path)",
+            "-o", "UpdateHostKeys=no",
+            "-o", "CheckHostIP=no",
+            "-o", "HashKnownHosts=no",
+            "-o", "CanonicalizeHostname=no",
+            "-o", "ProxyCommand=none",
+            "-o", "ProxyJump=none",
+            "-o", "ControlMaster=no",
+            "-o", "ControlPath=none",
+            "-o", "ControlPersist=no",
+            "-o", "AddKeysToAgent=no",
+            "-o", "UseKeychain=no",
+            "-o", "IdentityAgent=none",
+            "-o", "CertificateFile=none",
+            "-o", "PKCS11Provider=none",
             "-p", String(connection.port),
             "\(connection.username)@\(connection.host)"
         ]
@@ -174,7 +218,6 @@ extension LocalSSHTerminalView {
             args.insert(contentsOf: ["-i", privateKeyPath], at: 0)
             args.insert(contentsOf: [
                 "-o", "IdentitiesOnly=yes",
-                "-o", "IdentityAgent=none"
             ], at: 0)
         } else {
             args.insert(contentsOf: [
@@ -200,20 +243,6 @@ extension LocalSSHTerminalView {
         }
 
         return args
-    }
-
-    private static func launchctlArguments(
-        wrapping executable: String,
-        arguments: [String]
-    ) -> [String] {
-        ["asuser", String(getuid()), executable] + arguments
-    }
-
-    static func openSSHOptionValue(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: " ", with: "\\ ")
-            .replacingOccurrences(of: "\t", with: "\\\t")
     }
 
     private static func sshArguments(for forward: ConnectionRecord.PortForward) -> [String] {

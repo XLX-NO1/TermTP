@@ -55,6 +55,12 @@ public struct CitadelSSHClient: SSHClientProviding {
     }
 
     public func connect(record: ConnectionRecord, credential: Credential?) async throws -> SSHSessionProviding {
+        let client = try await makeClient(record: record, credential: credential)
+
+        return CitadelSSHSession(record: record, client: client)
+    }
+
+    public func makeClient(record: ConnectionRecord, credential: Credential?) async throws -> SSHClient {
         let client = try await SSHClient.connect(
             host: record.host,
             port: Int(record.port),
@@ -63,7 +69,7 @@ public struct CitadelSSHClient: SSHClientProviding {
             reconnect: .never
         )
 
-        return CitadelSSHSession(record: record, client: client)
+        return client
     }
 
     func authenticationMethod(for record: ConnectionRecord, credential: Credential?) throws -> SSHAuthenticationMethod {

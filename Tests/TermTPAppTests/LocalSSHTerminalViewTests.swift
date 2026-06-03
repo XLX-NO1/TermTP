@@ -4,6 +4,50 @@ import TermTPCore
 @testable import TermTPApp
 
 @MainActor
+private func isolatedSSHBaseArguments() -> [String] {
+    [
+        "-F",
+        "/dev/null",
+        "-o",
+        "IgnoreUnknown=UseKeychain",
+        "-o",
+        "StrictHostKeyChecking=ask",
+        "-o",
+        "GlobalKnownHostsFile=/dev/null",
+        "-o",
+        "UserKnownHostsFile=\(LocalSSHTerminalView.knownHostsFileURL.path)",
+        "-o",
+        "UpdateHostKeys=no",
+        "-o",
+        "CheckHostIP=no",
+        "-o",
+        "HashKnownHosts=no",
+        "-o",
+        "CanonicalizeHostname=no",
+        "-o",
+        "ProxyCommand=none",
+        "-o",
+        "ProxyJump=none",
+        "-o",
+        "ControlMaster=no",
+        "-o",
+        "ControlPath=none",
+        "-o",
+        "ControlPersist=no",
+        "-o",
+        "AddKeysToAgent=no",
+        "-o",
+        "UseKeychain=no",
+        "-o",
+        "IdentityAgent=none",
+        "-o",
+        "CertificateFile=none",
+        "-o",
+        "PKCS11Provider=none"
+    ]
+}
+
+@MainActor
 @Test func passwordLaunchEnvironmentKeepsTermVariable() {
     let askPassScriptPath = "/tmp/termtp-test-askpass.sh"
     let launch = LocalSSHTerminalView.launchConfiguration(
@@ -21,8 +65,9 @@ import TermTPCore
     #expect(launch.environment?.contains("SSH_ASKPASS=\(askPassScriptPath)") == true)
     #expect(launch.environment?.contains("TERMTP_SSH_PASSWORD=secret") == false)
     #expect(launch.environment?.contains("TERMTP_SSH_PASSWORD_FILE=/tmp/termtp-test-askpass/password") == true)
-    #expect(launch.executable == "/bin/launchctl")
-    #expect(launch.args.prefix(3) == ["asuser", String(getuid()), "/usr/bin/ssh"])
+    #expect(launch.environment?.contains("HOME=\(LocalSSHTerminalView.isolatedHomeURL.path)") == true)
+    #expect(launch.environment?.contains("PATH=/usr/bin:/bin:/usr/sbin:/sbin") == true)
+    #expect(launch.executable == "/usr/bin/ssh")
     #expect(launch.args.contains("StrictHostKeyChecking=accept-new"))
     #expect(launch.args.contains("-F"))
     #expect(launch.args.contains("/dev/null"))
@@ -30,6 +75,11 @@ import TermTPCore
     #expect(launch.args.contains("PreferredAuthentications=password"))
     #expect(launch.args.contains("PubkeyAuthentication=no"))
     #expect(launch.args.contains("NumberOfPasswordPrompts=1"))
+    #expect(launch.args.contains("UseKeychain=no"))
+    #expect(launch.args.contains("IdentityAgent=none"))
+    #expect(launch.args.contains("ProxyCommand=none"))
+    #expect(launch.args.contains("ProxyJump=none"))
+    #expect(launch.args.contains("ControlMaster=no"))
 }
 
 @MainActor
@@ -40,9 +90,9 @@ import TermTPCore
     )
 
     #expect(launch.environment?.contains("TERM=xterm-256color") == true)
+    #expect(launch.environment?.contains("HOME=\(LocalSSHTerminalView.isolatedHomeURL.path)") == true)
     #expect(launch.environment?.contains("SSH_ASKPASS_REQUIRE=force") == false)
-    #expect(launch.executable == "/bin/launchctl")
-    #expect(launch.args.prefix(3) == ["asuser", String(getuid()), "/usr/bin/ssh"])
+    #expect(launch.executable == "/usr/bin/ssh")
 }
 
 @MainActor
@@ -97,18 +147,9 @@ import TermTPCore
     #expect(launch.args.contains("jump.example.com"))
     #expect(launch.args.contains("-L"))
     #expect(launch.args.contains("127.0.0.1:8080:localhost:80"))
-    #expect(launch.args.suffix(11) == [
-        "-F",
-        "/dev/null",
-        "-o",
-        "StrictHostKeyChecking=ask",
-        "-o",
-        "GlobalKnownHostsFile=/dev/null",
-        "-o",
-        "UserKnownHostsFile=\(LocalSSHTerminalView.openSSHOptionValue(LocalSSHTerminalView.knownHostsFileURL.path))",
-        "-p",
-        "2222",
-        "deploy@prod.example.com"
+    let isolatedArguments = isolatedSSHBaseArguments()
+    #expect(Array(launch.args.suffix(isolatedArguments.count + 3)) == isolatedArguments + [
+        "-p", "2222", "deploy@prod.example.com"
     ])
 }
 
@@ -119,18 +160,9 @@ import TermTPCore
         credential: nil
     )
 
-    #expect(launch.args.suffix(11) == [
-        "-F",
-        "/dev/null",
-        "-o",
-        "StrictHostKeyChecking=ask",
-        "-o",
-        "GlobalKnownHostsFile=/dev/null",
-        "-o",
-        "UserKnownHostsFile=\(LocalSSHTerminalView.openSSHOptionValue(LocalSSHTerminalView.knownHostsFileURL.path))",
-        "-p",
-        "22",
-        "me@localhost"
+    let isolatedArguments = isolatedSSHBaseArguments()
+    #expect(Array(launch.args.suffix(isolatedArguments.count + 3)) == isolatedArguments + [
+        "-p", "22", "me@localhost"
     ])
 }
 
@@ -144,10 +176,15 @@ import TermTPCore
     #expect(launch.args.contains("-F"))
     #expect(launch.args.contains("/dev/null"))
     #expect(launch.args.contains("GlobalKnownHostsFile=/dev/null"))
-    #expect(launch.args.contains("UserKnownHostsFile=\(LocalSSHTerminalView.openSSHOptionValue(LocalSSHTerminalView.knownHostsFileURL.path))"))
+    #expect(launch.args.contains("UserKnownHostsFile=\(LocalSSHTerminalView.knownHostsFileURL.path)"))
     #expect(launch.args.contains("PreferredAuthentications=password"))
     #expect(launch.args.contains("PubkeyAuthentication=no"))
-    #expect(!launch.args.contains("IdentityAgent=none"))
+    #expect(launch.args.contains("IdentitiesOnly=yes") == false)
+    #expect(launch.args.contains("IdentityAgent=none"))
+    #expect(launch.args.contains("AddKeysToAgent=no"))
+    #expect(launch.args.contains("UseKeychain=no"))
+    #expect(launch.args.contains("CertificateFile=none"))
+    #expect(launch.args.contains("PKCS11Provider=none"))
 }
 
 @MainActor
@@ -156,19 +193,14 @@ import TermTPCore
         executable: "/usr/bin/ssh",
         args: [
             "-o",
-            "UserKnownHostsFile=/Users/me/Library/Application\\ Support/TermTP/known_hosts",
+            "UserKnownHostsFile=/Users/me/.termtp/known_hosts",
             "root@192.168.3.55"
         ],
         environment: nil
     )
 
-    #expect(launch.debugCommand.contains("'UserKnownHostsFile=/Users/me/Library/Application\\ Support/TermTP/known_hosts'"))
+    #expect(launch.debugCommand.contains("UserKnownHostsFile=/Users/me/.termtp/known_hosts"))
     #expect(launch.debugCommand.hasSuffix("root@192.168.3.55"))
-}
-
-@MainActor
-@Test func launchArgumentsEscapeOpenSSHOptionValuesWithSpaces() {
-    #expect(LocalSSHTerminalView.openSSHOptionValue("/Users/me/Library/Application Support/TermTP/known_hosts") == "/Users/me/Library/Application\\ Support/TermTP/known_hosts")
 }
 
 @MainActor

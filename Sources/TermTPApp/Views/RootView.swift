@@ -30,6 +30,17 @@ struct RootView: View {
                         onRenameTab: state.renameTab,
                         onCommandHandled: state.clearPendingTerminalCommand,
                         onTerminalInput: state.sendInputToSelectedTab,
+                        onLocalSSHProcessStarted: { started in
+                            Task { @MainActor in
+                                state.handleLocalSSHProcessStarted(started)
+                            }
+                        },
+                        onLocalSSHProcessExit: { exit in
+                            Task { @MainActor in
+                                state.handleLocalSSHProcessExit(exit)
+                            }
+                        },
+                        hostKeyTrustStore: state.hostKeyTrustStore,
                         strings: state.t
                     )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -95,6 +106,9 @@ struct RootView: View {
         }
         .animation(.snappy(duration: 0.22), value: state.isSidebarVisible)
         .animation(.snappy(duration: 0.22), value: state.isSFTPDrawerVisible)
+        .onAppear {
+            state.requestLocalNetworkPermission()
+        }
     }
 
     private var compactControls: some View {

@@ -33,6 +33,7 @@ final class AppState {
     let connectionStore: ConnectionStore
     let connectionTimeoutSeconds: Double
     let hostKeyTrustStore: AppHostKeyTrustStore
+    let localSSHDebugLogWriter: @Sendable (LocalSSHProcessExit) -> Void
 
     var isSidebarVisible = true
     var isSFTPDrawerVisible = true
@@ -112,7 +113,8 @@ final class AppState {
         legacyCredentialStore: FileCredentialStore = FileCredentialStore(fileURL: AppState.defaultCredentialStoreURL),
         sftpService: any SFTPServicing = CitadelSFTPService(),
         connectionStore: ConnectionStore = ConnectionStore(fileURL: AppState.defaultConnectionStoreURL),
-        connectionTimeoutSeconds: Double = 10
+        connectionTimeoutSeconds: Double = 10,
+        localSSHDebugLogWriter: @escaping @Sendable (LocalSSHProcessExit) -> Void = LocalSSHDebugLogger.writeDebugLog
     ) {
         let hostKeyTrustStore = AppHostKeyTrustStore()
         self.hostKeyTrustStore = hostKeyTrustStore
@@ -125,6 +127,7 @@ final class AppState {
         self.sftpService = sftpService
         self.connectionStore = connectionStore
         self.connectionTimeoutSeconds = connectionTimeoutSeconds
+        self.localSSHDebugLogWriter = localSSHDebugLogWriter
         self.defaults = defaults
         self.tabs = tabs
         self.connections = connections
@@ -137,5 +140,9 @@ final class AppState {
         hostKeyTrustStore.onPromptChanged = { [weak self] prompt in
             self?.pendingHostKeyPrompt = prompt
         }
+    }
+
+    func requestLocalNetworkPermission() {
+        LocalNetworkPermissionRequester.shared.requestIfNeeded()
     }
 }

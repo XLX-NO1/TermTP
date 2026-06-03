@@ -22,7 +22,7 @@ actor LocalSSHOnlySession: SSHSessionProviding {
     }
 
     var state: SSHSessionState {
-        .connected
+        .localProcessRunning
     }
 
     func send(_ input: String) async throws {}
